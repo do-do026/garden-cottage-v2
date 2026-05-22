@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Build output
+dist/
+server/dist/
+build/
+
+# Environment variables
+.env
+server/.env
+!.env.example
+!server/.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Codebuddy
+.codebuddy/

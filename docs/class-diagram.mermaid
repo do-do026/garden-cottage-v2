@@ -1,0 +1,345 @@
+---
+title: Hermes Chat V2 — 增量类图 (仅新增/变更类型)
+---
+
+%% ============================================
+%% 共享类型层 — V2 增量
+%% ============================================
+
+classDiagram
+    direction TB
+
+    class MessageType {
+        <<enumeration>>
+        TEXT
+        MARKDOWN
+        GAME
+        PROGRESS
+        SYSTEM
+        UI_MOD
+        CARD        ☆V2新增
+        WIDGET      ☆V2新增
+    }
+
+    class ContextStrategy {
+        <<enumeration>>
+        full            ☆V2新增
+        recent          ☆V2新增
+        model-managed   ☆V2新增
+    }
+
+    class CardTemplate {
+        <<enumeration>>
+        bouquet     ☆V2新增
+        recipe      ☆V2新增
+        task        ☆V2新增
+        info        ☆V2新增
+    }
+
+    class WidgetTemplate {
+        <<enumeration>>
+        poll        ☆V2新增
+    }
+
+    class UIModType {
+        <<enumeration>>
+        SET_THEME
+        SET_PRIMARY_COLOR
+        ADD_BUTTON       ☆V1定义→V2实现
+        SHOW_MODAL       ☆V1定义→V2实现
+        SET_BACKGROUND
+        SET_FONT         ☆V2新增
+        SET_LAYOUT       ☆V2新增
+    }
+
+    class Chat {
+        +string id
+        +string title
+        +string[] participants        ☆修改: 替代 botId
+        +string lastMessage?
+        +number unreadCount
+        +number updatedAt
+        +number createdAt
+    }
+
+    class Bot {
+        +string id
+        +string name
+        +string avatarUrl?
+        +string hermesAddress
+        +number hermesPort
+        +string authToken?
+        +BotStatus status
+        +ContextStrategy contextStrategy           ☆V2新增
+        +number maxContextMessages                 ☆V2新增
+        +number lastSeen
+    }
+
+    class Message {
+        +string id
+        +MessageType type
+        +string chatId
+        +string senderId
+        +string content
+        +MessageMetadata metadata
+        +MessageStatus status
+        +number timestamp
+        +number editedAt?
+        +string[] mentions?             ☆V2新增
+    }
+
+    class MessageMetadata {
+        +string gameUrl?
+        +number progressValue?
+        +number progressMax?
+        +string progressLabel?
+        +UIModInstruction uiMod?
+        +string replyTo?
+        +CardData card?                 ☆V2新增
+        +WidgetData widget?             ☆V2新增
+        +MessageStyle style?            ☆V2新增
+        +number remainingContextTokens? ☆V2新增
+    }
+
+    class MessageStyle {
+        +string color?
+        +string backgroundColor?
+        +string fontSize?
+        +string fontWeight?
+        +string borderRadius?
+        +string padding?
+        +string margin?
+    }
+
+    class UIModInstruction {
+        +UIModType type
+        +string payload
+    }
+
+    class CardData {
+        +CardTemplate template
+        +BouquetCardData bouquet?
+        +RecipeCardData recipe?
+        +TaskCardData task?
+        +InfoCardData info?
+        +string title
+        +string thumbnailUrl?
+    }
+
+    class BouquetCardData {
+        +string[] flowerNames
+        +string[] colors
+        +string meaning
+        +string occasion?
+    }
+
+    class RecipeCardData {
+        +string dishName
+        +string[] ingredients
+        +string[] steps
+        +number cookTime
+        +string difficulty
+    }
+
+    class TaskCardData {
+        +string taskName
+        +string assignee?
+        +string dueDate?
+        +string priority
+        +string[] subtasks
+    }
+
+    class InfoCardData {
+        +string htmlBody
+        +string imageUrl?
+        +string sourceUrl?
+        +string sourceLabel?
+    }
+
+    class WidgetData {
+        +WidgetTemplate template
+        +PollWidgetData poll?
+        +string widgetId
+    }
+
+    class PollWidgetData {
+        +string question
+        +PollOption[] options
+        +boolean allowMultiple
+        +number endTime?
+    }
+
+    class PollOption {
+        +string id
+        +string label
+        +number voteCount
+    }
+
+    class PollState {
+        +string widgetId
+        +Map~string, Set~string~~ votes
+        +PollOption[] options
+        +boolean isActive
+        +getResults(): PollOption[]
+        +castVote(userId, optionIds): void
+    }
+
+    class MentionMatch {
+        +string botId
+        +string botName
+        +number startIndex
+        +number endIndex
+    }
+
+    Message --> MessageType
+    Message --> MessageMetadata
+    MessageMetadata --> CardData
+    MessageMetadata --> WidgetData
+    MessageMetadata --> MessageStyle
+    MessageMetadata --> UIModInstruction
+    CardData --> CardTemplate
+    CardData --> BouquetCardData
+    CardData --> RecipeCardData
+    CardData --> TaskCardData
+    CardData --> InfoCardData
+    WidgetData --> WidgetTemplate
+    WidgetData --> PollWidgetData
+    PollWidgetData --> PollOption
+    UIModInstruction --> UIModType
+    Chat --> Bot : participants[]
+    Bot --> ContextStrategy
+    PollState --> PollOption
+
+
+%% ============================================
+%% 前端核心接口 — V2 增量 (仅变更部分)
+%% ============================================
+
+classDiagram
+    direction TB
+
+    class ChatStore_V2 {
+        +Chat[] chats
+        +Message[] messages
+        +string activeChatId
+        +string activeParticipantId     ☆V2新增
+        +boolean isLoading
+        +addMessage(msg): void
+        +updateMessage(id, partial): void
+        +setActiveChat(chatId): void
+        +switchActiveBot(botId): void   ☆V2新增
+        +createMultiChat(title, participants): void ☆V2新增
+        +markAsRead(chatId): void
+        +loadHistory(chatId): Promise
+        +sendMessage(content, type, mentions): void ☆V2修改: +mentions
+    }
+
+    class BotStore_V2 {
+        +Bot[] bots
+        +Bot activeBot?
+        +addBot(bot): void
+        +updateBotContextStrategy(id, strategy, max): void ☆V2新增
+    }
+
+    class UIStore_V2 {
+        +string theme
+        +string primaryColor
+        +boolean isMobile
+        +boolean sidebarOpen
+        +Map~string, ButtonConfig~ injectedButtons ☆V2新增
+        +ModalConfig[] modalStack                    ☆V2新增
+        +string fontFamily                           ☆V2新增
+        +string layoutMode                           ☆V2新增
+        +addButton(buttonId, config): void           ☆V2新增
+        +removeButton(buttonId): void                ☆V2新增
+        +showModal(config): void                     ☆V2新增
+        +closeModal(): void                          ☆V2新增
+        +setFont(family): void                       ☆V2新增
+        +setLayout(mode): void                       ☆V2新增
+    }
+
+    class MessageRenderer_V2 {
+        +render(message): ReactNode
+        -renderText(msg): ReactNode
+        -renderMarkdown(msg): ReactNode
+        -renderGame(msg): ReactNode
+        -renderProgress(msg): ReactNode
+        -renderSystem(msg): ReactNode
+        -renderCard(msg): ReactNode     ☆V2新增
+        -renderWidget(msg): ReactNode   ☆V2新增
+    }
+
+    class MentionDropdown {
+        +Bot[] participants
+        +string filterText
+        +number cursorPosition
+        +boolean isOpen
+        +onSelect(bot: Bot): void
+        +filterBots(query: string): Bot[]
+    }
+
+    class ActiveBotSwitcher {
+        +Bot[] participants
+        +string activeBotId
+        +onSwitch(botId: string): void
+    }
+
+    class PollWidget {
+        +PollWidgetData data
+        +PollOption[] results
+        +boolean hasVoted
+        +castVote(optionIds): void
+        +renderResults(): ReactNode
+    }
+
+    ChatStore_V2 ..> MentionDropdown : drives
+    ChatStore_V2 ..> ActiveBotSwitcher : drives
+    MessageRenderer_V2 --> PollWidget : renders
+    UIStore_V2 ..> ActiveBotSwitcher : reads layout
+
+
+%% ============================================
+%% 后端核心接口 — V2 增量
+%% ============================================
+
+classDiagram
+    direction TB
+
+    class MessageRouter_V2 {
+        +routeFromHermes(botId, rawMsg): Message
+        +routeFromFrontend(msg): void
+        +parseMentions(content, participants): string[] ☆V2新增
+        +routeByMentions(msg): void                      ☆V2新增
+        +transformMessage(raw): Message
+        +validateMessage(msg): boolean
+        +persistMessage(msg): void
+    }
+
+    class ContextManager {
+        +Map~string, ContextConfig~ configs    ☆V2新增
+        +getContext(chatId, botId): Promise~Message[]~  ☆V2新增
+        +estimateTokens(messages): number      ☆V2新增
+        +setStrategy(botId, strategy): void    ☆V2新增
+    }
+
+    class PollManager {
+        +Map~string, PollState~ polls          ☆V2新增
+        +registerPoll(widgetId, options): void ☆V2新增
+        +castVote(widgetId, userId, optionIds): void ☆V2新增
+        +getResults(widgetId): PollOption[]    ☆V2新增
+        +closePoll(widgetId): void             ☆V2新增
+        +scheduleClose(widgetId, endTime): void ☆V2新增
+    }
+
+    class Database_V2 {
+        +getChats(userId): Chat[]                              ☆修改: +participants
+        +saveChat(chat): void                                  ☆修改: +participants
+        +getBots(): Bot[]                                      ☆修改: +contextStrategy
+        +saveBot(bot): void                                    ☆修改: +contextStrategy
+        +getMessagesByChatAndBot(chatId, botId, limit): Message[] ☆V2新增
+    }
+
+    MessageRouter_V2 --> ContextManager : uses
+    MessageRouter_V2 --> PollManager : uses
+    MessageRouter_V2 --> Database_V2 : persists
+    PollManager --> PollState : manages

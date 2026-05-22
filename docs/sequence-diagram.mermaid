@@ -1,0 +1,227 @@
+---
+title: Hermes Chat V2 — 增量时序图
+---
+
+%% ============================================
+%% V2-1: @mention 消息路由完整链路
+%% ============================================
+
+sequenceDiagram
+    participant User
+    participant MI as MessageInput
+    participant MD as MentionDropdown
+    participant CS as ChatStore
+    participant SS as SocketService
+    participant WM as WebSocketManager
+    participant MR as MessageRouter
+    participant DB as Database
+    participant CM as ContextManager
+    participant HC as HermesConnector
+    participant B1 as Bot A (Hermes)
+    participant B2 as Bot B (Hermes)
+
+    Note over User,MI: ═══ 阶段1: @mention 输入补全 ═══
+    User->>MI: 输入 "@"
+    MI->>MI: 检测 @ 字符 + 光标位置
+    MI->>MD: 弹出下拉 (position=光标)
+    MD->>CS: 读取 chat.participants[]
+    CS-->>MD: Bot[] 列表
+    MD->>MD: 渲染候选列表 (名称+头像)
+    User->>MD: 选择 "Bot A"
+    MD->>MI: 插入 "@Bot A " 到光标处
+    MD->>MD: 收起下拉
+    User->>MI: 继续输入 "你好，帮我查一下天气"
+    MI->>MI: content = "@Bot A 你好，帮我查一下天气"
+    MI->>MI: mentions = [{botId:"b1", name:"Bot A"}]
+
+    Note over MI,HC: ═══ 阶段2: 消息发送 + @路由 ═══
+    User->>MI: 点击发送
+    MI->>CS: sendMessage("@Bot A 你好...", mentions:["b1"])
+    CS->>CS: 构建 Message {content, mentions:["b1"], status:SENDING}
+    CS->>SS: emitMessage(msg)
+    SS->>WM: Socket.IO 'message:send'
+    WM->>MR: routeFromFrontend(msg)
+    MR->>MR: validateMessage(msg)
+    MR->>DB: persistMessage(msg)
+
+    MR->>MR: 检查 msg.mentions
+
+    alt 有 @mentions: ["b1"]
+        MR->>MR: routeByMentions → 目标: Bot A only
+        MR->>CM: getContext(chatId, "b1")
+        CM->>CM: 读取 Bot.contextStrategy
+        alt strategy = 'full'
+            CM->>DB: 读取全部历史消息
+            CM-->>MR: 全量上下文 (最多1000条)
+        else strategy = 'recent'
+            CM->>DB: 读取最近 N 条 (maxContextMessages)
+            CM-->>MR: 最近 N 条上下文
+        else strategy = 'model-managed'
+            CM->>DB: 读取全部历史消息
+            CM->>CM: tiktoken 估算 remainingTokens
+            CM-->>MR: 全量上下文 + remainingContextTokens
+        end
+        MR->>HC: sendMessage("b1", msg + context)
+        HC->>B1: WebSocket → Bot A
+        Note over B2: Bot B 未收到消息 (未被@)
+    else 无 @mentions
+        MR->>MR: routeToAll → 遍历 chat.participants
+        loop 每个 participant
+            MR->>CM: getContext(chatId, botId)
+            CM-->>MR: 上下文
+            MR->>HC: sendMessage(botId, msg + context)
+            HC->>B1: WebSocket → Bot A
+            HC->>B2: WebSocket → Bot B
+        end
+    end
+
+    Note over B1,CS: ═══ 阶段3: Bot 回复回传 ═══
+    par Bot A 回复
+        B1-->>HC: 回复消息
+        HC-->>MR: onMessage("b1", reply)
+        MR->>DB: persistMessage(reply)
+        MR->>WM: broadcastToChat(chatId, 'message:new', reply)
+        WM->>SS: 'message:new'
+        SS->>CS: addMessage(reply)
+        CS->>CS: 按 senderId 渲染气泡 (Bot A 名称+头像)
+    and Bot B 可能也回复 (若消息路由到了B2)
+        B2-->>HC: 回复消息
+        HC-->>MR: onMessage("b2", reply)
+        MR->>DB: persistMessage(reply)
+        MR->>WM: broadcastToChat(chatId, 'message:new', reply)
+        WM->>SS: 'message:new'
+        SS->>CS: addMessage(reply)
+        CS->>CS: 按 senderId 渲染气泡 (Bot B 名称+头像, 不同颜色)
+    end
+
+
+%% ============================================
+%% V2-2: WIDGET 投票完整回传链路
+%% ============================================
+
+sequenceDiagram
+    participant Bot as Hermes Bot
+    participant HC as HermesConnector
+    participant MR as MessageRouter
+    participant WM as WebSocketManager
+    participant PM as PollManager
+    participant DB as Database
+    participant FE_A as 用户A 前端
+    participant FE_B as 用户B 前端
+    participant PW_A as PollWidget (A)
+    participant PW_B as PollWidget (B)
+
+    Note over Bot,FE_B: ═══ 阶段1: Bot 发起投票 ═══
+    Bot->>HC: 推送 WIDGET 消息
+    Note right of Bot: {type:WIDGET, metadata:{widget:{template:poll,
+    Note right of Bot:  poll:{question:"午餐吃什么?",
+    Note right of Bot:  options:[{id:"1",label:"中餐"},{id:"2",label:"日料"},{id:"3",label:"西餐"}],
+    Note right of Bot:  allowMultiple:true, endTime:1700000000000}}}
+    HC->>MR: routeFromHermes(botId, rawMsg)
+    MR->>MR: validateMessage → type=WIDGET ✓
+    MR->>DB: persistMessage(msg)
+    MR->>PM: registerPoll("widget-001", options)
+    PM->>PM: 初始化 PollState
+    Note right of PM: votes: Map{}, isActive:true
+    PM->>PM: 若 endTime 存在 → scheduleClose()
+    MR->>WM: broadcastToChat(chatId, 'message:new', msg)
+    WM->>FE_A: 'message:new' (WIDGET)
+    WM->>FE_B: 'message:new' (WIDGET)
+    FE_A->>PW_A: 渲染 PollWidget (0票, 未投票)
+    FE_B->>PW_B: 渲染 PollWidget (0票, 未投票)
+
+    Note over FE_A,FE_B: ═══ 阶段2: 并发投票 ═══
+    FE_A->>PW_A: 用户A 点击 "中餐" + "日料" (多选)
+    PW_A->>PW_A: UI 立即反馈 (选中态)
+    PW_A->>WM: Socket.IO 'widget:vote'
+    Note right of PW_A: {widgetId:"widget-001", optionIds:["1","2"], userId:"userA", chatId:"c1"}
+    WM->>PM: castVote("widget-001", "userA", ["1","2"])
+    PM->>PM: votes.set("userA", Set{"1","2"})
+    PM->>PM: 重新计算 getResults()
+    Note right of PM: 中餐:1, 日料:1, 西餐:0
+    PM->>WM: broadcastToChat 'widget:result'
+    Note right of PM: {widgetId:"widget-001", options:[...], isActive:true}
+    WM->>FE_A: 'widget:result'
+    WM->>FE_B: 'widget:result'
+    PW_A->>PW_A: 更新进度条 (中餐50%, 日料50%, 西餐0%)
+    PW_B->>PW_B: 更新进度条 (中餐50%, 日料50%, 西餐0%)
+
+    FE_B->>PW_B: 用户B 点击 "西餐"
+    PW_B->>WM: 'widget:vote' {widgetId:"widget-001", optionIds:["3"], userId:"userB", chatId:"c1"}
+    WM->>PM: castVote("widget-001", "userB", ["3"])
+    PM->>PM: votes.set("userB", Set{"3"})
+    PM->>PM: 重新计算 getResults()
+    Note right of PM: 中餐:1, 日料:1, 西餐:1
+    PM->>WM: broadcastToChat 'widget:result'
+    WM->>FE_A: 'widget:result'
+    WM->>FE_B: 'widget:result'
+    PW_A->>PW_A: 更新进度条 (33%/33%/33%)
+    PW_B->>PW_B: 更新进度条 (33%/33%/33%)
+
+    Note over FE_A,FE_B: ═══ 阶段3: 投票截止 ═══
+    PM->>PM: 定时器触发 → endTime 到达
+    PM->>PM: isActive = false
+    PM->>PM: 冻结最终结果
+    PM->>WM: broadcastToChat 'widget:closed'
+    Note right of PM: {widgetId:"widget-001", finalResults:[...], isActive:false}
+    WM->>FE_A: 'widget:closed'
+    WM->>FE_B: 'widget:closed'
+    PW_A->>PW_A: 禁用投票按钮, 显示最终结果
+    PW_B->>PW_B: 禁用投票按钮, 显示最终结果
+
+
+%% ============================================
+%% V2-3: UI Mod 扩展 — ADD_BUTTON + SHOW_MODAL 流程
+%% ============================================
+
+sequenceDiagram
+    participant Bot as Hermes Bot
+    participant WM as WebSocketManager
+    participant FE as Frontend
+    participant UIS as UIStore
+    participant Nav as TopNavbar
+    participant Modal as MUI Dialog
+
+    Note over Bot,Nav: ═══ ADD_BUTTON 流程 ═══
+    Bot->>WM: 推送 UI_MOD 消息
+    Note right of Bot: {type:UI_MOD, uiMod:{type:ADD_BUTTON, payload:"open_dashboard"}}
+    WM->>FE: 'message:new' (type=UI_MOD)
+    FE->>UIS: applyUIMod(msg.metadata.uiMod)
+    UIS->>UIS: 白名单校验 → ADD_BUTTON ✓
+    UIS->>UIS: addButton("open_dashboard", {label:"仪表盘", icon:DashboardIcon})
+    UIS->>Nav: 触发 TopNavbar 重渲染
+    Nav->>Nav: 渲染新按钮 "仪表盘"
+    User->>Nav: 点击 "仪表盘" 按钮
+    Nav->>FE: emit 'uimod:button-click' {buttonId:"open_dashboard"}
+    FE->>WM: Socket.IO 'uimod:button-click'
+    WM->>Bot: 回传点击事件
+    Bot-->>WM: Bot 可据此推送新消息/打开页面
+
+    Note over Bot,Modal: ═══ SHOW_MODAL 流程 ═══
+    Bot->>WM: 推送 UI_MOD 消息
+    Note right of Bot: {type:UI_MOD, uiMod:{type:SHOW_MODAL,
+    Note right of Bot:  payload:'{"title":"确认操作","body":"确定要执行此任务吗?",
+    Note right of Bot:  "actions":[{"label":"确定","actionId":"confirm"},{"label":"取消","actionId":"cancel"}]}'}}
+    WM->>FE: 'message:new' (type=UI_MOD)
+    FE->>UIS: applyUIMod(msg.metadata.uiMod)
+    UIS->>UIS: 白名单校验 → SHOW_MODAL ✓
+    UIS->>UIS: showModal({title, body, actions})
+    UIS->>Modal: 渲染 MUI Dialog
+    Modal->>Modal: 显示标题+正文+按钮
+    User->>Modal: 点击 "确定"
+    Modal->>FE: emit 'uimod:modal-action' {actionId:"confirm"}
+    FE->>WM: Socket.IO 'uimod:modal-action'
+    WM->>Bot: 回传操作结果
+    UIS->>UIS: closeModal()
+    Modal->>Modal: Dialog 关闭
+
+    Note over Bot,FE: ═══ SET_FONT + SET_LAYOUT 流程 ═══
+    Bot->>WM: UI_MOD {type:SET_FONT, payload:"JetBrains Mono, monospace"}
+    WM->>FE: 'message:new'
+    FE->>UIS: setFont("JetBrains Mono, monospace")
+    UIS->>FE: 全局 font-family 更新
+
+    Bot->>WM: UI_MOD {type:SET_LAYOUT, payload:"compact"}
+    WM->>FE: 'message:new'
+    FE->>UIS: setLayout("compact")
+    UIS->>FE: 消息间距缩小, 全局重渲染
