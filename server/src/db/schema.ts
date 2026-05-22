@@ -25,6 +25,7 @@ export function createTables(db: Database.Database): void {
       hermes_address  TEXT    NOT NULL,
       hermes_port     INTEGER NOT NULL,
       auth_token      TEXT,
+      connectorType   TEXT    NOT NULL DEFAULT 'hermes',
       status          TEXT    NOT NULL DEFAULT 'OFFLINE',
       last_seen       INTEGER,
       created_at      INTEGER NOT NULL,
@@ -125,4 +126,18 @@ export function createTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_tasks_bot_id
       ON tasks(bot_id);
   `);
+
+  // ---------------------------------------------------------
+  // V2 migrations — idempotent ALTER TABLE additions
+  // ---------------------------------------------------------
+
+  // Add participants column to chats for multi-bot support
+  try { db.exec("ALTER TABLE chats ADD COLUMN participants TEXT DEFAULT '[]'"); } catch (_) { /* column already exists */ }
+
+  // Add context strategy columns to bots
+  try { db.exec("ALTER TABLE bots ADD COLUMN contextStrategy TEXT DEFAULT 'full'"); } catch (_) { /* column already exists */ }
+  try { db.exec('ALTER TABLE bots ADD COLUMN maxContextMessages INTEGER DEFAULT 20'); } catch (_) { /* column already exists */ }
+
+  // V2: connectorType for Operit support
+  try { db.exec("ALTER TABLE bots ADD COLUMN connectorType TEXT DEFAULT 'hermes'"); } catch (_) { /* column already exists */ }
 }

@@ -22,11 +22,19 @@ export interface ChatState {
   isLoading: boolean;
   /** Last error message, or null when no error. */
   error: string | null;
+  /** Map of chatId → currently active bot ID for routing replies. */
+  activeBotId: Record<string, string>;
 
   // -- Actions -------------------------------------------------
 
   /** Switch the active chat conversation. */
   setActiveChat: (chatId: string) => void;
+  /** Set which bot the next message should be routed to in a chat. */
+  setActiveBotId: (chatId: string, botId: string | null) => void;
+  /** Add a bot participant to a chat. */
+  addChatParticipant: (chatId: string, botId: string) => void;
+  /** Remove a bot participant from a chat. */
+  removeChatParticipant: (chatId: string, botId: string) => void;
   /** Append a single message to its chat's message list. */
   addMessage: (message: Message) => void;
   /** Partially update an existing message (e.g. status change). */
@@ -66,6 +74,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeChatId: null,
   isLoading: false,
   error: null,
+  activeBotId: {},
 
   // -- Actions --
 
@@ -211,5 +220,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   getChatById: (id: string): Chat | undefined => {
     return get().chats.find((c) => c.id === id);
+  },
+
+  setActiveBotId: (chatId: string, botId: string | null): void => {
+    set((state) => {
+      if (botId === null) {
+        const { [chatId]: _removed, ...rest } = state.activeBotId;
+        return { activeBotId: rest };
+      }
+      return { activeBotId: { ...state.activeBotId, [chatId]: botId } };
+    });
+  },
+
+  addChatParticipant: (chatId: string, botId: string): void => {
+    set((state) => ({
+      chats: state.chats.map((c) => {
+        if (c.id !== chatId) return c;
+        const participants = c.participants ?? [];
+        if (participants.includes(botId)) return c;
+        return { ...c, participants: [...participants, botId] };
+      }),
+    }));
+  },
+
+  removeChatParticipant: (chatId: string, botId: string): void => {
+    set((state) => ({
+      chats: state.chats.map((c) => {
+        if (c.id !== chatId) return c;
+        const participants = (c.participants ?? []).filter((p) => p !== botId);
+        return { ...c, participants };
+      }),
+    }));
   },
 }));

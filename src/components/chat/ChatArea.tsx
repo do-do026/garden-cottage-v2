@@ -1,8 +1,8 @@
 // ============================================================
 // Hermes Chat — ChatArea Component
 // The main conversation view: a header with the bot's name and
-// online status, a scrollable message list, and a message
-// input bar at the bottom.
+// online status, a BotSwitcher chip for routing replies, a
+// scrollable message list, and a message input bar at the bottom.
 // ============================================================
 
 import React, { useEffect } from 'react';
@@ -12,6 +12,7 @@ import IconButton from '@mui/material/IconButton';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import MessageList from '@/components/chat/MessageList';
 import MessageInput from '@/components/chat/MessageInput';
+import BotSwitcher from '@/components/chat/BotSwitcher';
 import Avatar from '@/components/common/Avatar';
 import Spinner from '@/components/common/Spinner';
 import { useChat } from '@/hooks/useChat';
@@ -20,7 +21,7 @@ import { BotStatus } from '@shared/types';
 import { TOPBAR_HEIGHT } from '@/config/constants';
 
 const ChatArea: React.FC = () => {
-  const { activeChat, messages, isLoading, sendMessage, loadHistory, error } = useChat();
+  const { activeChat, messages, isLoading, sendMessage, loadHistory, error, activeBotId, setActiveBotId } = useChat();
   const getBotById = useBotStore((s) => s.getBotById);
 
   const bot = activeChat ? getBotById(activeChat.botId) : null;
@@ -69,6 +70,11 @@ const ChatArea: React.FC = () => {
             {isOnline ? 'Online' : 'Offline'}
           </Typography>
         </Box>
+        <BotSwitcher
+          chatId={activeChat.id}
+          activeBotId={activeBotId}
+          onSelectBot={setActiveBotId}
+        />
         <IconButton size="small">
           <MoreVertIcon />
         </IconButton>

@@ -39,7 +39,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     <Box
       className={`my-1 flex ${isUser ? 'justify-end' : 'justify-start'}`}
     >
-      <Box className="flex max-w-[75%] flex-col gap-0.5">
+      <Box
+        className={`flex flex-col gap-0.5 ${
+          message.type === MessageType.CARD || message.type === MessageType.WIDGET
+            ? 'max-w-[90%]'
+            : 'max-w-[75%]'
+        }`}
+      >
         {/* Bubble */}
         <Box
           className={`message-bubble ${

@@ -5,6 +5,9 @@
 // ============================================================
 
 import type { UserSettings } from './types.js';
+import type { ContextStrategy } from './types.js';
+import type { CardTemplate } from './types.js';
+import type { WidgetTemplate } from './types.js';
 
 // -----------------------------------------------------------
 // Socket.IO Event Names
@@ -31,6 +34,17 @@ export const SOCKET_EVENTS = {
   UI_MOD: 'ui:mod',
   /** Client or scheduler triggers a task execution. */
   TASK_TRIGGER: 'task:trigger',
+  // -- V2 additions -----------------------------------------
+  /** Client sends a vote on a widget (e.g. poll). */
+  WIDGET_VOTE: 'widget:vote',
+  /** Server broadcasts the current widget results. */
+  WIDGET_RESULT: 'widget:result',
+  /** Server signals that a widget has been closed. */
+  WIDGET_CLOSED: 'widget:closed',
+  /** Client reports a UI mod button click back to the bot. */
+  UIMOD_BUTTON_CLICK: 'uimod:button-click',
+  /** Client reports a UI mod modal action back to the bot. */
+  UIMOD_MODAL_ACTION: 'uimod:modal-action',
 } as const;
 
 // -----------------------------------------------------------
@@ -45,6 +59,8 @@ export const MESSAGE_TYPES = {
   PROGRESS: 'PROGRESS',
   SYSTEM: 'SYSTEM',
   UI_MOD: 'UI_MOD',
+  CARD: 'CARD',
+  WIDGET: 'WIDGET',
 } as const;
 
 // -----------------------------------------------------------
@@ -64,6 +80,73 @@ export const WHITELISTED_UI_MODS: ReadonlySet<string> = new Set([
   'SET_PRIMARY_COLOR',
   'SET_BACKGROUND',
 ]);
+
+// -----------------------------------------------------------
+// V2: UI Mod Extended Whitelist
+// Covers all UIMod additions for V2 including experimental types.
+// -----------------------------------------------------------
+
+/**
+ * Extended whitelist for V2 UI modifications.
+ * Includes experimental button, modal, font, and layout mods
+ * that are security-reviewed for V2.
+ */
+export const UI_MOD_WHITELIST_V2 = new Set([
+  'SET_THEME',
+  'SET_PRIMARY_COLOR',
+  'SET_BACKGROUND',
+  'ADD_BUTTON',
+  'SHOW_MODAL',
+  'SET_FONT',
+  'SET_LAYOUT',
+]);
+
+// -----------------------------------------------------------
+// V2: CARD & WIDGET Template Registries
+// -----------------------------------------------------------
+
+/** Registered CARD template identifiers. */
+export const CARD_TEMPLATES: readonly CardTemplate[] = ['bouquet', 'recipe', 'task', 'info'];
+
+/** Registered WIDGET template identifiers. */
+export const WIDGET_TEMPLATES: readonly WidgetTemplate[] = ['poll'];
+
+// -----------------------------------------------------------
+// V2: Style Whitelist
+// -----------------------------------------------------------
+
+/** Allowed keys for MessageStyle objects. Only these are forwarded to the DOM. */
+export const STYLE_WHITELIST: readonly string[] = [
+  'background',
+  'border',
+  'fontFamily',
+  'fontSize',
+  'fontWeight',
+  'color',
+  'borderRadius',
+];
+
+// -----------------------------------------------------------
+// V2: HTML Sanitisation for Info Cards
+// -----------------------------------------------------------
+
+/** Allowed HTML tags inside InfoCardData.body content (after DOMPurify). */
+export const ALLOWED_HTML_TAGS: readonly string[] = [
+  'b', 'i', 'u', 'a', 'ul', 'ol', 'li', 'br', 'p', 'span', 'h3', 'h4',
+];
+
+// -----------------------------------------------------------
+// V2: Context Strategy Defaults
+// -----------------------------------------------------------
+
+/** Default context strategy for new bots. */
+export const DEFAULT_CONTEXT_STRATEGY: ContextStrategy = 'full';
+
+/** Default maximum number of messages to include in a bot's context window. */
+export const DEFAULT_MAX_CONTEXT_MESSAGES = 20;
+
+/** Absolute upper bound on context messages to prevent memory issues. */
+export const MAX_CONTEXT_MESSAGES_LIMIT = 1000;
 
 // -----------------------------------------------------------
 // Default User Settings

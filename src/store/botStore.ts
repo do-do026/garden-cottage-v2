@@ -6,6 +6,8 @@
 
 import { create } from 'zustand';
 import type { Bot, BotStatus } from '@shared/types';
+import type { ContextStrategy } from '@shared/types';
+import { useChatStore } from './chatStore';
 
 // -----------------------------------------------------------
 // State Shape
@@ -37,6 +39,10 @@ export interface BotState {
   setLoading: (loading: boolean) => void;
   /** Set or clear the error message. */
   setError: (error: string | null) => void;
+  /** Update a bot's context strategy and max context messages. */
+  updateBotContext: (id: string, contextStrategy: ContextStrategy, maxContextMessages: number) => void;
+  /** Get all bots that are participants in a specific chat. */
+  getBotsForChat: (chatId: string) => Bot[];
 }
 
 // -----------------------------------------------------------
@@ -92,5 +98,21 @@ export const useBotStore = create<BotState>((set, get) => ({
 
   setError: (error: string | null): void => {
     set({ error });
+  },
+
+  updateBotContext: (id: string, contextStrategy: ContextStrategy, maxContextMessages: number): void => {
+    set((state) => ({
+      bots: state.bots.map((b) =>
+        b.id === id ? { ...b, contextStrategy, maxContextMessages } : b,
+      ),
+    }));
+  },
+
+  getBotsForChat: (chatId: string): Bot[] => {
+    const chat = useChatStore.getState().chats.find((c) => c.id === chatId);
+    if (!chat?.participants) return [];
+    const bots = get().bots;
+    const participantSet = new Set(chat.participants);
+    return bots.filter((b) => participantSet.has(b.id));
   },
 }));

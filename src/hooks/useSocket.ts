@@ -44,22 +44,21 @@ export function useSocket(token?: string): UseSocketReturn {
     socketService.disconnect();
   }, []);
 
-  // Auto-connect on mount, disconnect on unmount.
-  //
-  // IMPORTANT: This hook manages a top-level singleton Socket.IO connection.
-  // It should only be called ONCE in the root component (e.g. <App>).
-  // Do NOT use this hook in nested components — doing so will cause
-  // premature disconnection when a child unmounts.
-  //
-  // The cleanup function directly disconnects the global singleton because
-  // the expectation is that this effect runs once for the app lifecycle.
-  // When the root component unmounts (e.g. hot-reload in dev), the socket
-  // should be fully torn down so the next mount can start fresh.
+  // Auto-connect on mount. In React StrictMode (dev), the effect
+  // runs twice (mount → unmount → mount). Since the socket is a
+  // global singleton, we must NOT disconnect it in the cleanup —
+  // that would tear down the connection that the second mount
+  // still depends on. Instead, we use a `subscribed` flag to
+  // prevent duplicate subscriptions and only unsubscribe our
+  // event handlers on cleanup.
   useEffect(() => {
+    let subscribed = true;
+
     socketService.connect(token);
 
     // Subscribe to all server events and dispatch to stores
     const unsubMessage = socketService.onMessage((msg: Message) => {
+      if (!subscribed) return;
       // UI_MOD messages are handled by the UIMod listener — don't
       // add them to the chat message list.
       if (msg.type === MT.UI_MOD) return;
@@ -69,6 +68,7 @@ export function useSocket(token?: string): UseSocketReturn {
 
     const unsubProgress = socketService.onProgress(
       (data: { messageId: string; value: number; max: number; label: string }) => {
+        if (!subscribed) return;
         // Find the message via a best-effort scan across chats
         const store = useChatStore.getState();
         for (const chatId of Object.keys(store.messages)) {
@@ -89,6 +89,7 @@ export function useSocket(token?: string): UseSocketReturn {
     );
 
     const unsubUIMod = socketService.onUIMod((mod: UIModInstruction) => {
+      if (!subscribed) return;
       const applied = useUIStore.getState().applyUIMod(mod);
       if (applied) {
         // Create a system message to notify the user
@@ -107,17 +108,19 @@ export function useSocket(token?: string): UseSocketReturn {
 
     const unsubBotStatus = socketService.onBotStatus(
       (data: { botId: string; status: BotStatus }) => {
+        if (!subscribed) return;
         updateBotStatus(data.botId, data.status);
       },
     );
 
     return () => {
+      subscribed = false;
       unsubMessage();
       unsubProgress();
       unsubUIMod();
       unsubBotStatus();
-      // Disconnect the global singleton — this effect is the sole owner.
-      socketService.disconnect();
+      // DO NOT disconnect the socket here — it's a global singleton
+      // managed by the app lifecycle, not the component lifecycle.
     };
     // Run only on mount/unmount
     // eslint-disable-next-line react-hooks/exhaustive-deps

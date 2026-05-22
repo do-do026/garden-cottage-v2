@@ -31,11 +31,16 @@ router.get('/bots', (_req: Request, res: Response, next: NextFunction): void => 
 // -----------------------------------------------------------
 router.post('/bots', (req: Request, res: Response, next: NextFunction): void => {
   try {
-    const { name, hermesAddress, hermesPort, authToken } = req.body;
+    const { name, hermesAddress, hermesPort, authToken, connectorType } = req.body;
 
     if (!name || !hermesAddress) {
       throw new AppError(400, 'VALIDATION_ERROR', 'name and hermesAddress are required.');
     }
+
+    // Validate connectorType if provided
+    const resolvedConnectorType = (connectorType === 'operit' || connectorType === 'hermes')
+      ? connectorType
+      : 'hermes';
 
     const now = Date.now();
     const bot: Bot = {
@@ -45,6 +50,7 @@ router.post('/bots', (req: Request, res: Response, next: NextFunction): void => 
       hermesAddress: String(hermesAddress),
       hermesPort: typeof hermesPort === 'number' ? hermesPort : 8080,
       authToken: authToken ?? undefined,
+      connectorType: resolvedConnectorType,
       status: BotStatus.OFFLINE,
       lastSeen: now,
     };
@@ -97,6 +103,33 @@ router.post('/bots/:id/connect', (req: Request, res: Response, next: NextFunctio
     }
 
     const updated = queries.getBotById(id)!;
+    res.json({ data: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------
+// PATCH /api/bots/:id/context — Update bot context strategy
+// -----------------------------------------------------------
+router.patch('/bots/:id/context', (req: Request, res: Response, next: NextFunction): void => {
+  try {
+    const { id } = req.params;
+    const bot = queries.getBotById(id);
+    if (!bot) {
+      throw new AppError(404, 'NOT_FOUND', `Bot "${id}" not found.`);
+    }
+
+    const { contextStrategy, maxContextMessages } = req.body;
+    if (contextStrategy && !['full', 'recent', 'model-managed'].includes(contextStrategy)) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'contextStrategy must be full, recent, or model-managed.');
+    }
+
+    const updated = queries.updateBotContext(id, {
+      contextStrategy: contextStrategy ?? bot.contextStrategy,
+      maxContextMessages: maxContextMessages ?? bot.maxContextMessages,
+    });
+
     res.json({ data: updated });
   } catch (err) {
     next(err);

@@ -63,6 +63,7 @@ function rowToBot(row: Record<string, unknown>): Bot {
     hermesAddress: row.hermes_address as string,
     hermesPort: row.hermes_port as number,
     authToken: row.auth_token as string | undefined,
+    connectorType: (row.connectorType as 'hermes' | 'operit') ?? 'hermes',
     status: row.status as BotStatus,
     lastSeen: row.last_seen as number,
   };
@@ -271,8 +272,8 @@ export function saveBot(bot: Bot): void {
 
   db.prepare(
     `INSERT OR REPLACE INTO bots
-       (id, name, avatar_url, hermes_address, hermes_port, auth_token, status, last_seen, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, name, avatar_url, hermes_address, hermes_port, auth_token, connectorType, status, last_seen, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     bot.id,
     bot.name,
@@ -280,6 +281,7 @@ export function saveBot(bot: Bot): void {
     bot.hermesAddress,
     bot.hermesPort,
     bot.authToken ?? null,
+    bot.connectorType ?? 'hermes',
     bot.status,
     bot.lastSeen,
     createdAt,
@@ -427,4 +429,26 @@ export function saveUserSettings(settings: UserSettings): void {
     settings.notifications ? 1 : 0,
     settings.language,
   );
+}
+
+// -----------------------------------------------------------
+// V2: Bot Context & Chat Participants
+// -----------------------------------------------------------
+
+/** Update a bot's context strategy and max context messages. */
+export function updateBotContext(botId: string, data: { contextStrategy: string; maxContextMessages: number }): Bot {
+  const db = getDb();
+  const stmt = db.prepare(
+    'UPDATE bots SET contextStrategy = ?, maxContextMessages = ? WHERE id = ?'
+  );
+  stmt.run(data.contextStrategy, data.maxContextMessages, botId);
+  return getBotById(botId) as Bot;
+}
+
+/** Update the participants array for a chat. */
+export function updateChatParticipants(chatId: string, participants: string[]): void {
+  const db = getDb();
+  const json = JSON.stringify(participants);
+  const stmt = db.prepare('UPDATE chats SET participants = ? WHERE id = ?');
+  stmt.run(json, chatId);
 }

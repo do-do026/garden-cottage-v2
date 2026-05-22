@@ -111,6 +111,21 @@ export async function connectBot(id: string): Promise<Bot> {
   return res.data;
 }
 
+/** Payload for updating a bot's context strategy. */
+export interface UpdateBotContextPayload {
+  contextStrategy: string;
+  maxContextMessages: number;
+}
+
+/** Update a bot's context strategy and max context messages. */
+export async function updateBotContext(botId: string, data: UpdateBotContextPayload): Promise<Bot> {
+  const res = await request<{ data: Bot }>(`/bots/${encodeURIComponent(botId)}/context`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return res.data;
+}
+
 // -----------------------------------------------------------
 // Chat endpoints
 // -----------------------------------------------------------
@@ -152,6 +167,22 @@ export async function searchMessages(query: string): Promise<Message[]> {
     `/messages/search?q=${encodeURIComponent(query)}`,
   );
   return res.data;
+}
+
+/** Add a bot participant to a chat. */
+export async function addChatParticipant(chatId: string, botId: string): Promise<Chat> {
+  const res = await request<{ data: Chat }>(
+    `/chats/${encodeURIComponent(chatId)}/participants`,
+    { method: 'POST', body: JSON.stringify({ botId }) },
+  );
+  return res.data;
+}
+
+/** Remove a bot participant from a chat. */
+export async function removeChatParticipant(chatId: string, botId: string): Promise<void> {
+  await request(`/chats/${encodeURIComponent(chatId)}/participants/${encodeURIComponent(botId)}`, {
+    method: 'DELETE',
+  });
 }
 
 // -----------------------------------------------------------

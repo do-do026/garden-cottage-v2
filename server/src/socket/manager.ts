@@ -18,8 +18,9 @@ import type { Server as HttpServer } from 'node:http';
 import { Server as SocketIOServer, type Socket } from 'socket.io';
 import { SOCKET_EVENTS } from '../../../shared/constants.js';
 import { HermesClient } from '../services/hermesClient.js';
+import { OperitConnector } from '../services/operitConnector.js';
 import * as queries from '../db/queries.js';
-import type { Bot, Message } from '../../../shared/types.js';
+import type { Bot, Message, WidgetVoteEvent, WidgetResultEvent } from '../../../shared/types.js';
 import { BotStatus, MessageStatus } from '../../../shared/types.js';
 import { v4 as uuidv4 } from 'uuid';
 import type { HermesMessage } from '../../../shared/types.js';
@@ -30,7 +31,7 @@ import type { HermesMessage } from '../../../shared/types.js';
 
 interface ConnectedBot {
   bot: Bot;
-  hermesClient: HermesClient;
+  connector: HermesClient | OperitConnector;
 }
 
 // -----------------------------------------------------------
@@ -80,55 +81,94 @@ export class WebSocketManager {
     // Clean up any existing connection for this bot
     await this.disconnectBot(bot.id);
 
-    const hermesClient = new HermesClient({
-      host: bot.hermesAddress,
-      port: bot.hermesPort,
-      authToken: bot.authToken,
-      onMessage: (msg: HermesMessage) => {
-        this.handleHermesMessage(bot.id, msg);
-      },
-      onConnect: () => {
-        queries.updateBotStatus(bot.id, BotStatus.ONLINE);
-        this.broadcastBotStatus(bot.id, BotStatus.ONLINE);
-        console.log(`[WSManager] Bot "${bot.name}" (${bot.id}) connected.`);
-      },
-      onDisconnect: (reason: string) => {
-        queries.updateBotStatus(bot.id, BotStatus.OFFLINE);
-        this.broadcastBotStatus(bot.id, BotStatus.OFFLINE);
-        this.connectedBots.delete(bot.id);
-        console.log(`[WSManager] Bot "${bot.name}" (${bot.id}) disconnected: ${reason}`);
-      },
-      onError: (err: Error) => {
-        console.error(`[WSManager] Bot "${bot.name}" error:`, err.message);
+    const useOperit = bot.connectorType === 'operit';
+
+    if (useOperit) {
+      const operitConnector = new OperitConnector({
+        host: bot.hermesAddress,
+        port: bot.hermesPort,
+        authToken: bot.authToken,
+        onResponse: (msg: HermesMessage) => {
+          this.handleHermesMessage(bot.id, msg);
+        },
+        onConnect: () => {
+          queries.updateBotStatus(bot.id, BotStatus.ONLINE);
+          this.broadcastBotStatus(bot.id, BotStatus.ONLINE);
+          console.log(`[WSManager] Bot "${bot.name}" (${bot.id}) connected via Operit.`);
+        },
+        onDisconnect: (reason: string) => {
+          queries.updateBotStatus(bot.id, BotStatus.OFFLINE);
+          this.broadcastBotStatus(bot.id, BotStatus.OFFLINE);
+          this.connectedBots.delete(bot.id);
+          console.log(`[WSManager] Bot "${bot.name}" (${bot.id}) Operit disconnected: ${reason}`);
+        },
+        onError: (err: Error) => {
+          console.error(`[WSManager] Bot "${bot.name}" Operit error:`, err.message);
+          queries.updateBotStatus(bot.id, BotStatus.ERROR);
+          this.broadcastBotStatus(bot.id, BotStatus.ERROR);
+        },
+      });
+
+      try {
+        await operitConnector.connect();
+        this.connectedBots.set(bot.id, { bot, connector: operitConnector });
+      } catch (err) {
         queries.updateBotStatus(bot.id, BotStatus.ERROR);
         this.broadcastBotStatus(bot.id, BotStatus.ERROR);
-      },
-    });
+        throw err;
+      }
+    } else {
+      // Default: Hermes WebSocket
+      const hermesClient = new HermesClient({
+        host: bot.hermesAddress,
+        port: bot.hermesPort,
+        authToken: bot.authToken,
+        onMessage: (msg: HermesMessage) => {
+          this.handleHermesMessage(bot.id, msg);
+        },
+        onConnect: () => {
+          queries.updateBotStatus(bot.id, BotStatus.ONLINE);
+          this.broadcastBotStatus(bot.id, BotStatus.ONLINE);
+          console.log(`[WSManager] Bot "${bot.name}" (${bot.id}) connected via Hermes.`);
+        },
+        onDisconnect: (reason: string) => {
+          queries.updateBotStatus(bot.id, BotStatus.OFFLINE);
+          this.broadcastBotStatus(bot.id, BotStatus.OFFLINE);
+          this.connectedBots.delete(bot.id);
+          console.log(`[WSManager] Bot "${bot.name}" (${bot.id}) disconnected: ${reason}`);
+        },
+        onError: (err: Error) => {
+          console.error(`[WSManager] Bot "${bot.name}" error:`, err.message);
+          queries.updateBotStatus(bot.id, BotStatus.ERROR);
+          this.broadcastBotStatus(bot.id, BotStatus.ERROR);
+        },
+      });
 
-    try {
-      await hermesClient.connect();
-      this.connectedBots.set(bot.id, { bot, hermesClient });
-    } catch (err) {
-      queries.updateBotStatus(bot.id, BotStatus.ERROR);
-      this.broadcastBotStatus(bot.id, BotStatus.ERROR);
-      throw err;
+      try {
+        await hermesClient.connect();
+        this.connectedBots.set(bot.id, { bot, connector: hermesClient });
+      } catch (err) {
+        queries.updateBotStatus(bot.id, BotStatus.ERROR);
+        this.broadcastBotStatus(bot.id, BotStatus.ERROR);
+        throw err;
+      }
     }
   }
 
-  /** Disconnect a bot's Hermes WebSocket. */
+  /** Disconnect a bot's connector (Hermes or Operit). */
   async disconnectBot(botId: string): Promise<void> {
     const entry = this.connectedBots.get(botId);
     if (entry) {
-      entry.hermesClient.close();
+      entry.connector.close();
       this.connectedBots.delete(botId);
     }
   }
 
-  /** Send a message to a specific Hermes agent. */
-  sendToHermes(botId: string, msg: HermesMessage): boolean {
+  /** Send a message to a specific bot via its active connector. */
+  sendToBot(botId: string, msg: HermesMessage): boolean {
     const entry = this.connectedBots.get(botId);
-    if (!entry || !entry.hermesClient.ready) return false;
-    entry.hermesClient.send(msg);
+    if (!entry || !entry.connector.ready) return false;
+    entry.connector.send(msg);
     return true;
   }
 
@@ -169,14 +209,14 @@ export class WebSocketManager {
       const chat = queries.getChatById(msg.chatId);
       if (chat) {
         const botEntry = this.connectedBots.get(chat.botId);
-        if (botEntry?.hermesClient.ready) {
+        if (botEntry?.connector.ready) {
           const hermesMsg: HermesMessage = {
             type: 'chat:message',
             payload: msg,
             timestamp: Date.now(),
             traceId: uuidv4(),
           };
-          botEntry.hermesClient.send(hermesMsg);
+          botEntry.connector.send(hermesMsg);
         }
       }
 
@@ -226,20 +266,37 @@ export class WebSocketManager {
       }
     });
 
+    // -- widget:vote — user votes on a widget, forward to bot
+    socket.on(SOCKET_EVENTS.WIDGET_VOTE, (event: WidgetVoteEvent) => {
+      const chat = queries.getChatById(event.chatId);
+      if (!chat) return;
+
+      const botEntry = this.connectedBots.get(chat.botId);
+      if (botEntry?.connector.ready) {
+        const hermesMsg: HermesMessage = {
+          type: 'widget:vote',
+          payload: event,
+          timestamp: Date.now(),
+          traceId: uuidv4(),
+        };
+        botEntry.connector.send(hermesMsg);
+      }
+    });
+
     // -- task:trigger — manually trigger a task
     socket.on(SOCKET_EVENTS.TASK_TRIGGER, ({ taskId }: { taskId: string }) => {
       const task = queries.getTaskById(taskId);
       if (!task) return;
 
       const botEntry = this.connectedBots.get(task.botId);
-      if (botEntry?.hermesClient.ready) {
+      if (botEntry?.connector.ready) {
         const hermesMsg: HermesMessage = {
           type: 'task:execute',
           payload: { taskId: task.id, action: task.action },
           timestamp: Date.now(),
           traceId: uuidv4(),
         };
-        botEntry.hermesClient.send(hermesMsg);
+        botEntry.connector.send(hermesMsg);
       }
     });
 
@@ -291,6 +348,18 @@ export class WebSocketManager {
 
       case 'ui:mod': {
         this.io.emit(SOCKET_EVENTS.UI_MOD, msg.payload);
+        break;
+      }
+
+      case 'widget:result': {
+        const payload = msg.payload as WidgetResultEvent;
+        this.io.to(`chat:${payload.chatId}`).emit(SOCKET_EVENTS.WIDGET_RESULT, payload);
+        break;
+      }
+
+      case 'widget:closed': {
+        const payload = msg.payload as { widgetId: string; chatId: string };
+        this.io.to(`chat:${payload.chatId}`).emit(SOCKET_EVENTS.WIDGET_CLOSED, payload);
         break;
       }
 

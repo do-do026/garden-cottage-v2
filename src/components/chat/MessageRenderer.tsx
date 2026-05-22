@@ -8,6 +8,8 @@
 //   GAME      → GameMessage
 //   PROGRESS  → ProgressMessage
 //   SYSTEM    → SystemMessage
+//   CARD      → CardRenderer
+//   WIDGET    → WidgetRenderer
 //   UI_MOD    → no rendered content (handled by socket listener)
 // ============================================================
 
@@ -18,6 +20,8 @@ import MarkdownMessage from '@/components/messages/MarkdownMessage';
 import GameMessage from '@/components/messages/GameMessage';
 import ProgressMessage from '@/components/messages/ProgressMessage';
 import SystemMessage from '@/components/messages/SystemMessage';
+import CardRenderer from '@/components/cards/CardRenderer';
+import WidgetRenderer from '@/components/widgets/WidgetRenderer';
 import type { Message } from '@shared/types';
 import { MessageType } from '@shared/types';
 
@@ -42,6 +46,12 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ message }) => {
 
     case MessageType.SYSTEM:
       return <SystemMessage message={message} />;
+
+    case MessageType.CARD:
+      return <CardRenderer message={message} />;
+
+    case MessageType.WIDGET:
+      return <WidgetRenderer message={message} />;
 
     case MessageType.UI_MOD:
       // UI_MOD messages are consumed by the socket listener

@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import type { UIModInstruction } from '@shared/types';
-import { WHITELISTED_UI_MODS, DEFAULT_SETTINGS } from '@shared/constants';
+import { DEFAULT_SETTINGS, UI_MOD_WHITELIST_V2 } from '@shared/constants';
 import type { UIComponentConfig, ConnectionStatus } from '@/types';
 
 // -----------------------------------------------------------
@@ -31,6 +31,12 @@ export interface UIState {
   injectedComponents: UIComponentConfig[];
   /** Socket.IO connection health. */
   connectionStatus: ConnectionStatus;
+  /** V2: Dynamic font family override from bot. */
+  fontFamily?: string;
+  /** V2: Layout preference from bot ('default' | 'compact' | 'wide'). */
+  layout?: 'default' | 'compact' | 'wide';
+  /** V2: Modal config from bot SHOW_MODAL. */
+  modalConfig?: { title: string; content: string; actions?: { label: string; id: string }[] } | null;
 
   // -- Actions -------------------------------------------------
 
@@ -62,6 +68,14 @@ export interface UIState {
   resetUI: () => void;
   /** Merge partial connection status updates. */
   setConnectionStatus: (status: Partial<ConnectionStatus>) => void;
+  /** V2: Set dynamic font family override. */
+  setFontFamily: (font?: string) => void;
+  /** V2: Set layout preference. */
+  setLayout: (layout?: 'default' | 'compact' | 'wide') => void;
+  /** V2: Show a modal from bot config. */
+  showModal: (config: UIState['modalConfig']) => void;
+  /** V2: Close the current modal. */
+  closeModal: () => void;
 }
 
 // -----------------------------------------------------------
@@ -90,6 +104,12 @@ export const useUIStore = create<UIState>((set, get) => ({
   isMobile: false,
   sidebarOpen: true,
   injectedComponents: [],
+  /** V2: Dynamic font family override from bot. */
+  fontFamily: undefined,
+  /** V2: Layout preference from bot. */
+  layout: undefined,
+  /** V2: Modal config from bot. */
+  modalConfig: null,
   connectionStatus: {
     connected: false,
     reconnecting: false,
@@ -123,8 +143,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
 
   applyUIMod: (mod: UIModInstruction): boolean => {
-    // -- Whitelist check --
-    if (!WHITELISTED_UI_MODS.has(mod.type)) {
+    // -- Whitelist check (V2 expanded) --
+    if (!UI_MOD_WHITELIST_V2.has(mod.type)) {
       console.warn(
         `[UIStore] Rejected UIMod — type "${mod.type}" is not whitelisted.`,
       );
@@ -170,6 +190,53 @@ export const useUIStore = create<UIState>((set, get) => ({
         return false;
       }
 
+      case 'ADD_BUTTON': {
+        const btnConfig = parsed as Record<string, unknown>;
+        const id = (btnConfig.id as string) ?? `btn-${Date.now()}`;
+        get().addInjectedComponent({
+          id,
+          type: 'button',
+          props: {
+            label: btnConfig.label ?? 'Action',
+            action: btnConfig.action ?? '',
+            color: btnConfig.color ?? 'primary',
+          },
+        });
+        return true;
+      }
+
+      case 'SHOW_MODAL': {
+        const modalConfig = parsed as Record<string, unknown>;
+        set({
+          modalConfig: {
+            title: (modalConfig.title as string) ?? '',
+            content: (modalConfig.content as string) ?? '',
+            actions: Array.isArray(modalConfig.actions)
+              ? (modalConfig.actions as { label: string; id: string }[])
+              : undefined,
+          },
+        });
+        return true;
+      }
+
+      case 'SET_FONT': {
+        const fontFamily = (parsed as Record<string, unknown>).fontFamily;
+        if (typeof fontFamily === 'string') {
+          set({ fontFamily });
+          return true;
+        }
+        return false;
+      }
+
+      case 'SET_LAYOUT': {
+        const layout = (parsed as Record<string, unknown>).layout;
+        if (layout === 'default' || layout === 'compact' || layout === 'wide') {
+          set({ layout });
+          return true;
+        }
+        return false;
+      }
+
       default:
         // Should never reach here due to whitelist, but be defensive
         console.warn(`[UIStore] Unhandled UIMod type: "${mod.type}".`);
@@ -204,7 +271,26 @@ export const useUIStore = create<UIState>((set, get) => ({
       backgroundColor: undefined,
       sidebarOpen: true,
       injectedComponents: [],
+      fontFamily: undefined,
+      layout: undefined,
+      modalConfig: null,
     });
+  },
+
+  setFontFamily: (font?: string): void => {
+    set({ fontFamily: font });
+  },
+
+  setLayout: (layout?: 'default' | 'compact' | 'wide'): void => {
+    set({ layout });
+  },
+
+  showModal: (config: UIState['modalConfig']): void => {
+    set({ modalConfig: config });
+  },
+
+  closeModal: (): void => {
+    set({ modalConfig: null });
   },
 
   setConnectionStatus: (status: Partial<ConnectionStatus>): void => {

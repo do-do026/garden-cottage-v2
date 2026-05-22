@@ -32,6 +32,10 @@ export interface UseChatReturn {
   selectChat: (chatId: string) => void;
   /** Mark a chat as read (reset unread count). */
   markAsRead: (chatId: string) => void;
+  /** The currently active bot ID for routing in the active chat. */
+  activeBotId: string | null;
+  /** Set the active bot for routing in the current chat. */
+  setActiveBotId: (botId: string | null) => void;
 }
 
 export function useChat(): UseChatReturn {
@@ -48,6 +52,8 @@ export function useChat(): UseChatReturn {
   const setLoading = useChatStore((s) => s.setLoading);
   const setError = useChatStore((s) => s.setError);
   const markAsReadStore = useChatStore((s) => s.markAsRead);
+  const activeBotId = useChatStore((s) => s.activeBotId[activeChatId ?? ''] ?? null);
+  const setActiveBotIdStore = useChatStore((s) => s.setActiveBotId);
 
   const activeChat = useMemo<Chat | null>(() => {
     if (!activeChatId) return null;
@@ -67,6 +73,23 @@ export function useChat(): UseChatReturn {
       const messageType = type ?? MT.TEXT;
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+      // Extract @mentions (alphanumeric + hyphens) from message content
+      const mentionPattern = /@([a-zA-Z0-9_-]+)/g;
+      const mentions: string[] = [];
+      let match: RegExpExecArray | null;
+      while ((match = mentionPattern.exec(text)) !== null) {
+        if (!mentions.includes(match[1])) {
+          mentions.push(match[1]);
+        }
+      }
+
+      // Determine target bot: @mentions take priority, then activeBotId
+      // Add activeBotId to mentions if not already present via @-mention
+      const targetBotId = activeBotId ?? null;
+      if (targetBotId && !mentions.includes(targetBotId)) {
+        mentions.push(targetBotId);
+      }
+
       // Build an optimistic message — shows up immediately in the UI
       const optimistic: Message = {
         id: tempId,
@@ -74,7 +97,9 @@ export function useChat(): UseChatReturn {
         chatId: activeChatId,
         senderId: 'user',
         content: text.trim(),
-        metadata: {},
+        metadata: {
+          ...(mentions.length > 0 ? { mentions } : {}),
+        },
         status: MessageStatus.SENDING,
         timestamp: Date.now(),
       };
@@ -113,7 +138,7 @@ export function useChat(): UseChatReturn {
         setError(msg);
       }
     },
-    [activeChatId, addMessage, updateMessage, setError],
+    [activeChatId, activeBotId, addMessage, updateMessage, setError],
   );
 
   /** Load paginated message history for a chat. */
@@ -161,6 +186,15 @@ export function useChat(): UseChatReturn {
     [markAsReadStore],
   );
 
+  /** Set the active bot for routing in the current chat. */
+  const setActiveBotId = useCallback(
+    (botId: string | null): void => {
+      if (!activeChatId) return;
+      setActiveBotIdStore(activeChatId, botId);
+    },
+    [activeChatId, setActiveBotIdStore],
+  );
+
   return {
     chats,
     messages: activeMessages,
@@ -171,5 +205,7 @@ export function useChat(): UseChatReturn {
     loadHistory,
     selectChat,
     markAsRead,
+    activeBotId,
+    setActiveBotId,
   };
 }

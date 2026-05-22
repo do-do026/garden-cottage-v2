@@ -16,6 +16,8 @@ export enum MessageType {
   PROGRESS = 'PROGRESS',
   SYSTEM = 'SYSTEM',
   UI_MOD = 'UI_MOD',
+  CARD = 'CARD',
+  WIDGET = 'WIDGET',
 }
 
 /** Delivery lifecycle status of a message. */
@@ -55,6 +57,112 @@ export enum TaskStatus {
 }
 
 // -----------------------------------------------------------
+// V2: Context Strategy
+// -----------------------------------------------------------
+
+/** Strategy for how a bot manages its conversation context window. */
+export type ContextStrategy = 'full' | 'recent' | 'model-managed';
+
+// -----------------------------------------------------------
+// V2: Message-level Styling
+// -----------------------------------------------------------
+
+/** Safe, whitelist-only inline style properties for individual messages. */
+export interface MessageStyle {
+  background?: string;
+  border?: string;
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: 'normal' | 'bold';
+  color?: string;
+  borderRadius?: string;
+}
+
+// -----------------------------------------------------------
+// V2: CARD Template Data
+// -----------------------------------------------------------
+
+/** Registered card templates available in the system. */
+export type CardTemplate = 'bouquet' | 'recipe' | 'task' | 'info';
+
+/** Data payload for the bouquet card template. */
+export interface BouquetCardData {
+  title: string;
+  materials: string[];
+  note?: string;
+}
+
+/** Data payload for the recipe card template. */
+export interface RecipeCardData {
+  title: string;
+  ingredients: string[];
+  steps: string[];
+  duration: string;
+}
+
+/** Data payload for the task card template. */
+export interface TaskCardData {
+  name: string;
+  progress: number; // 0–100
+  dueDate?: string; // ISO date string
+}
+
+/** Data payload for the info card template. */
+export interface InfoCardData {
+  title: string;
+  body: string; // supports a limited HTML subset
+  imageUrl?: string;
+}
+
+/** Union of all card data payloads. */
+export type CardData = BouquetCardData | RecipeCardData | TaskCardData | InfoCardData;
+
+// -----------------------------------------------------------
+// V2: WIDGET Template Data
+// -----------------------------------------------------------
+
+/** Registered widget templates available in the system. */
+export type WidgetTemplate = 'poll';
+
+/** A single option within a poll widget. */
+export interface PollOption {
+  id: string;
+  label: string;
+}
+
+/** Data payload for the poll widget template at creation time. */
+export interface PollWidgetData {
+  question: string;
+  options: PollOption[];
+  allowMultiple?: boolean;
+  durationMinutes?: number;
+}
+
+/** A poll option augmented with its current vote count. */
+export interface PollResultOption extends PollOption {
+  voteCount: number;
+}
+
+/** Event emitted when a user votes on a widget. */
+export interface WidgetVoteEvent {
+  widgetId: string;
+  chatId: string;
+  userId: string;
+  selectedOptionIds: string[];
+}
+
+/** Event emitted when widget results are broadcast. */
+export interface WidgetResultEvent {
+  widgetId: string;
+  chatId: string;
+  options: PollResultOption[];
+  isActive: boolean;
+}
+
+/** Union of all widget data payloads. */
+export type WidgetData = PollWidgetData;
+
+// -----------------------------------------------------------
 // Core Domain Interfaces
 // -----------------------------------------------------------
 
@@ -80,6 +188,16 @@ export interface MessageMetadata {
   uiMod?: UIModInstruction;
   /** ID of the message this one is replying to. */
   replyTo?: string;
+
+  // -- V2 additions -----------------------------------------
+  /** List of bot IDs that were @mentioned in this message. */
+  mentions?: string[];
+  /** Message-level inline style (whitelist-only, sanitised before render). */
+  style?: MessageStyle;
+  /** CARD message payload — template name and typed data. */
+  card?: { template: string; data: Record<string, unknown> };
+  /** WIDGET message payload — template name and typed data. */
+  widget?: { template: string; data: Record<string, unknown> };
 }
 
 /** A single message within a chat conversation. */
@@ -104,14 +222,19 @@ export interface Message {
   editedAt?: number;
 }
 
-/** A chat conversation between a user and a bot. */
+/** A chat conversation between a user and one or more bots. */
 export interface Chat {
   /** Unique chat identifier. */
   id: string;
   /** Display title for the chat. */
   title: string;
-  /** ID of the bot participating in this chat. */
+  /**
+   * ID of the bot participating in this chat.
+   * @deprecated — Use `participants` instead for multi-participant support.
+   */
   botId: string;
+  /** IDs of all participants in this chat (users and bots). */
+  participants: string[];
   /** Preview text of the most recent message (for sidebar). */
   lastMessage?: string;
   /** Number of unread messages for the current user. */
@@ -136,10 +259,17 @@ export interface Bot {
   hermesPort: number;
   /** Authentication token for connecting to the Hermes agent. */
   authToken?: string;
+  /** Connector type: 'hermes' (WebSocket) or 'operit' (HTTP POST). Defaults to 'hermes'. */
+  connectorType?: 'hermes' | 'operit';
   /** Current connection status. */
   status: BotStatus;
   /** Unix timestamp of the last heartbeat / seen event. */
   lastSeen: number;
+  // -- V2 additions -----------------------------------------
+  /** Strategy the bot uses to manage conversation context window. */
+  contextStrategy: ContextStrategy;
+  /** Maximum number of context messages to include (default 20). */
+  maxContextMessages: number;
 }
 
 /** A scheduled (cron) task attached to a bot. */

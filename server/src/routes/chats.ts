@@ -61,4 +61,46 @@ router.get('/chats/:id/messages', (req: Request, res: Response, next: NextFuncti
   }
 });
 
+// -----------------------------------------------------------
+// POST /api/chats/:id/participants — Add a bot to a chat
+// -----------------------------------------------------------
+router.post('/chats/:id/participants', (req: Request, res: Response, next: NextFunction): void => {
+  try {
+    const { id } = req.params;
+    const { botId } = req.body;
+    if (!botId) throw new AppError(400, 'VALIDATION_ERROR', 'botId is required.');
+
+    const chat = queries.getChatById(id);
+    if (!chat) throw new AppError(404, 'NOT_FOUND', `Chat "${id}" not found.`);
+
+    const participants = chat.participants ?? [];
+    if (!participants.includes(botId)) {
+      participants.push(botId);
+    }
+    queries.updateChatParticipants(id, participants);
+
+    res.json({ data: { ...chat, participants } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------
+// DELETE /api/chats/:id/participants/:botId — Remove a bot from a chat
+// -----------------------------------------------------------
+router.delete('/chats/:id/participants/:botId', (req: Request, res: Response, next: NextFunction): void => {
+  try {
+    const { id, botId } = req.params;
+    const chat = queries.getChatById(id);
+    if (!chat) throw new AppError(404, 'NOT_FOUND', `Chat "${id}" not found.`);
+
+    const participants = (chat.participants ?? []).filter((p: string) => p !== botId);
+    queries.updateChatParticipants(id, participants);
+
+    res.json({ data: { ...chat, participants } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

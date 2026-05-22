@@ -51,3 +51,10 @@ export interface GameResult {
   /** Unix-ms timestamp of when the game was completed. */
   completedAt: number;
 }
+
+// -----------------------------------------------------------
+// V2: CARD & WIDGET Frontend Types
+// -----------------------------------------------------------
+
+export type { CardComponentProps, CardComponentRegistry } from './card';
+export type { WidgetComponentProps, WidgetComponentRegistry } from './widget';

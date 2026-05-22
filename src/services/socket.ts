@@ -10,7 +10,7 @@ import { WS_URL } from '@/config';
 import { SOCKET_EVENTS } from '@shared/constants';
 import { SOCKET_RECONNECT_DELAY, SOCKET_RECONNECT_MAX_ATTEMPTS } from '@/config/constants';
 import { useUIStore } from '@/store/uiStore';
-import type { Message, UIModInstruction, BotStatus } from '@shared/types';
+import type { Message, UIModInstruction, BotStatus, WidgetVoteEvent, WidgetResultEvent } from '@shared/types';
 import type { GameResult } from '@/types';
 
 // -----------------------------------------------------------
@@ -22,6 +22,8 @@ export type GameResultHandler = (result: GameResult) => void;
 export type ProgressHandler = (data: { messageId: string; value: number; max: number; label: string }) => void;
 export type UIModHandler = (mod: UIModInstruction) => void;
 export type BotStatusHandler = (data: { botId: string; status: BotStatus }) => void;
+export type WidgetResultHandler = (event: WidgetResultEvent) => void;
+export type WidgetClosedHandler = (event: { widgetId: string }) => void;
 
 // -----------------------------------------------------------
 // Singleton
@@ -49,6 +51,8 @@ export class SocketService {
   private readonly progressHandlers: Set<ProgressHandler> = new Set();
   private readonly uiModHandlers: Set<UIModHandler> = new Set();
   private readonly botStatusHandlers: Set<BotStatusHandler> = new Set();
+  private readonly widgetResultHandlers: Set<WidgetResultHandler> = new Set();
+  private readonly widgetClosedHandlers: Set<WidgetClosedHandler> = new Set();
 
   /** Whether the socket is currently connected. */
   get connected(): boolean {
@@ -125,6 +129,14 @@ export class SocketService {
     this.socket.on(SOCKET_EVENTS.BOT_STATUS, (data: { botId: string; status: BotStatus }) => {
       this.botStatusHandlers.forEach((h) => h(data));
     });
+
+    this.socket.on(SOCKET_EVENTS.WIDGET_RESULT, (event: WidgetResultEvent) => {
+      this.widgetResultHandlers.forEach((h) => h(event));
+    });
+
+    this.socket.on(SOCKET_EVENTS.WIDGET_CLOSED, (event: { widgetId: string }) => {
+      this.widgetClosedHandlers.forEach((h) => h(event));
+    });
   }
 
   /** Gracefully disconnect and clean up. */
@@ -173,6 +185,11 @@ export class SocketService {
     this.socket?.emit(SOCKET_EVENTS.BOT_CONNECT, { botId });
   }
 
+  /** Send a widget vote to the server. */
+  emitWidgetVote(data: WidgetVoteEvent): void {
+    this.socket?.emit(SOCKET_EVENTS.WIDGET_VOTE, data);
+  }
+
   // -----------------------------------------------------------
   // Event subscriptions
   // -----------------------------------------------------------
@@ -205,6 +222,18 @@ export class SocketService {
   onBotStatus(handler: BotStatusHandler): () => void {
     this.botStatusHandlers.add(handler);
     return () => { this.botStatusHandlers.delete(handler); };
+  }
+
+  /** Subscribe to widget result updates. Returns an unsubscribe function. */
+  onWidgetResult(handler: WidgetResultHandler): () => void {
+    this.widgetResultHandlers.add(handler);
+    return () => { this.widgetResultHandlers.delete(handler); };
+  }
+
+  /** Subscribe to widget closed events. Returns an unsubscribe function. */
+  onWidgetClosed(handler: WidgetClosedHandler): () => void {
+    this.widgetClosedHandlers.add(handler);
+    return () => { this.widgetClosedHandlers.delete(handler); };
   }
 }
 

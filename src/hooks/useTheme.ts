@@ -22,6 +22,7 @@ export function useTheme(): UseThemeReturn {
   const themeMode = useUIStore((s) => s.theme);
   const primaryColor = useUIStore((s) => s.primaryColor);
   const backgroundColor = useUIStore((s) => s.backgroundColor);
+  const fontFamily = useUIStore((s) => s.fontFamily);
   const setTheme = useUIStore((s) => s.setTheme);
   const setPrimaryColor = useUIStore((s) => s.setPrimaryColor);
 
@@ -41,22 +42,24 @@ export function useTheme(): UseThemeReturn {
           ? { background: { default: backgroundColor } }
           : {}),
       },
-      typography: {
-        fontFamily: [
-          '-apple-system',
-          'BlinkMacSystemFont',
-          '"Segoe UI"',
-          'Roboto',
-          '"Helvetica Neue"',
-          'Arial',
-          'sans-serif',
-        ].join(','),
-      },
+      typography: fontFamily
+        ? { fontFamily }
+        : {
+            fontFamily: [
+              '-apple-system',
+              'BlinkMacSystemFont',
+              '"Segoe UI"',
+              'Roboto',
+              '"Helvetica Neue"',
+              'Arial',
+              'sans-serif',
+            ].join(','),
+          },
       shape: {
         borderRadius: 12,
       },
     });
-  }, [themeMode, primaryColor, backgroundColor]);
+  }, [themeMode, primaryColor, backgroundColor, fontFamily]);
 
   return { muiTheme, toggleTheme, setPrimaryColor };
 }
