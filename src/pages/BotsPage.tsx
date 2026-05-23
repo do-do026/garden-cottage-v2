@@ -20,6 +20,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import Chip from '@mui/material/Chip';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Avatar from '@/components/common/Avatar';
 import Spinner from '@/components/common/Spinner';
 import { useBotStore } from '@/store/botStore';
@@ -33,6 +35,7 @@ interface NewBotForm {
   hermesAddress: string;
   hermesPort: string;
   authToken: string;
+  connectorType: 'hermes' | 'operit';
 }
 
 const EMPTY_FORM: NewBotForm = {
@@ -40,6 +43,7 @@ const EMPTY_FORM: NewBotForm = {
   hermesAddress: '',
   hermesPort: '',
   authToken: '',
+  connectorType: 'hermes',
 };
 
 const STATUS_CHIP_COLOR: Record<string, 'success' | 'error' | 'warning' | 'default'> = {
@@ -62,6 +66,7 @@ const BotsPage: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [form, setForm] = useState<NewBotForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
 
   // Load bots on mount
   useEffect(() => {
@@ -81,11 +86,13 @@ const BotsPage: React.FC = () => {
 
   const handleOpenDialog = useCallback(() => {
     setForm(EMPTY_FORM);
+    setDialogError(null);
     setDialogOpen(true);
   }, []);
 
   const handleCloseDialog = useCallback(() => {
     setDialogOpen(false);
+    setDialogError(null);
   }, []);
 
   const handleFormChange = useCallback(
@@ -99,21 +106,24 @@ const BotsPage: React.FC = () => {
   const handleCreateBot = useCallback(async () => {
     if (!form.name.trim() || !form.hermesAddress.trim()) return;
     setSubmitting(true);
+    setDialogError(null);
     try {
       const bot = await api.createBot({
         name: form.name.trim(),
         hermesAddress: form.hermesAddress.trim(),
         hermesPort: parseInt(form.hermesPort, 10) || 8080,
         authToken: form.authToken || undefined,
+        connectorType: form.connectorType ?? 'hermes',
       });
       addBot(bot);
       setDialogOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create bot');
+      const msg = err instanceof Error ? err.message : 'Failed to create bot';
+      setDialogError(msg);
     } finally {
       setSubmitting(false);
     }
-  }, [form, addBot, setError]);
+  }, [form, addBot]);
 
   const handleConnect = useCallback(
     async (botId: string) => {
@@ -225,6 +235,16 @@ const BotsPage: React.FC = () => {
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Add Bot</DialogTitle>
         <DialogContent className="flex flex-col gap-3 pt-2">
+          <ToggleButtonGroup
+            value={form.connectorType}
+            exclusive
+            onChange={(_e, val) => val && setForm(prev => ({ ...prev, connectorType: val }))}
+            size="small"
+            fullWidth
+          >
+            <ToggleButton value="hermes">Hermes (WebSocket)</ToggleButton>
+            <ToggleButton value="operit">Operit (HTTP)</ToggleButton>
+          </ToggleButtonGroup>
           <TextField
             label="Bot Name"
             fullWidth
@@ -233,9 +253,9 @@ const BotsPage: React.FC = () => {
             required
           />
           <TextField
-            label="Hermes Address"
+            label="Address"
             fullWidth
-            placeholder="192.168.1.100"
+            placeholder={form.connectorType === 'operit' ? '127.0.0.1' : '192.168.1.100'}
             value={form.hermesAddress}
             onChange={handleFormChange('hermesAddress')}
             required
@@ -244,7 +264,7 @@ const BotsPage: React.FC = () => {
             label="Port"
             fullWidth
             type="number"
-            placeholder="8080"
+            placeholder={form.connectorType === 'operit' ? '8094' : '8080'}
             value={form.hermesPort}
             onChange={handleFormChange('hermesPort')}
           />
@@ -256,6 +276,11 @@ const BotsPage: React.FC = () => {
             onChange={handleFormChange('authToken')}
           />
         </DialogContent>
+        {dialogError && (
+          <Typography color="error" variant="body2" sx={{ px: 3, pt: 1 }}>
+            {dialogError}
+          </Typography>
+        )}
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button variant="contained" onClick={handleCreateBot} disabled={submitting}>

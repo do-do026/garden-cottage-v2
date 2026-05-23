@@ -80,6 +80,7 @@ export interface CreateBotPayload {
   hermesAddress: string;
   hermesPort: number;
   authToken?: string;
+  connectorType?: string;
 }
 
 /** Fetch all registered bots. */

@@ -66,6 +66,8 @@ function rowToBot(row: Record<string, unknown>): Bot {
     connectorType: (row.connectorType as 'hermes' | 'operit') ?? 'hermes',
     status: row.status as BotStatus,
     lastSeen: row.last_seen as number,
+    contextStrategy: (row.contextStrategy as string) ?? 'full',
+    maxContextMessages: (row.maxContextMessages as number) ?? 20,
   };
 }
 
@@ -272,8 +274,8 @@ export function saveBot(bot: Bot): void {
 
   db.prepare(
     `INSERT OR REPLACE INTO bots
-       (id, name, avatar_url, hermes_address, hermes_port, auth_token, connectorType, status, last_seen, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, name, avatar_url, hermes_address, hermes_port, auth_token, connectorType, status, last_seen, created_at, updated_at, contextStrategy, maxContextMessages)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     bot.id,
     bot.name,
@@ -286,6 +288,8 @@ export function saveBot(bot: Bot): void {
     bot.lastSeen,
     createdAt,
     now,
+    bot.contextStrategy ?? 'full',
+    bot.maxContextMessages ?? 20,
   );
 }
 

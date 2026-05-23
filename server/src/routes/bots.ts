@@ -11,6 +11,7 @@ import * as queries from '../db/queries.js';
 import { AppError } from '../middleware/errorHandler.js';
 import type { Bot } from '../../../shared/types.js';
 import { BotStatus } from '../../../shared/types.js';
+import { DEFAULT_CONTEXT_STRATEGY, DEFAULT_MAX_CONTEXT_MESSAGES } from '../../../shared/constants.js';
 
 const router: Router = Router();
 
@@ -53,6 +54,8 @@ router.post('/bots', (req: Request, res: Response, next: NextFunction): void => 
       connectorType: resolvedConnectorType,
       status: BotStatus.OFFLINE,
       lastSeen: now,
+      contextStrategy: DEFAULT_CONTEXT_STRATEGY,
+      maxContextMessages: DEFAULT_MAX_CONTEXT_MESSAGES,
     };
 
     queries.saveBot(bot);

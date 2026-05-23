@@ -106,7 +106,7 @@ export class OperitConnector {
         headers['Authorization'] = `Bearer ${this.authToken}`;
       }
 
-      const response = await fetch(`${this.baseUrl}/api/message`, {
+      const response = await fetch(`${this.baseUrl}/api/external-chat`, {
         method: 'POST',
         headers,
         body: JSON.stringify(msg),
