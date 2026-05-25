@@ -36,13 +36,22 @@ function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
+/** Read the user-configured API key from localStorage, falling back to the dev default. */
+function getApiKey(): string {
+  try {
+    return localStorage.getItem('hermes-api-key') || 'hermes-chat-dev-key';
+  } catch {
+    return 'hermes-chat-dev-key';
+  }
+}
+
 /** Shared fetch wrapper that normalises errors. */
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = apiUrl(path);
 
   const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    'x-api-key': 'hermes-chat-dev-key',
+    'x-api-key': getApiKey(),
   };
 
   const res = await fetch(url, {

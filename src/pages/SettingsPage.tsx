@@ -25,6 +25,9 @@ const SettingsPage: React.FC = () => {
   const theme = useUIStore((s) => s.theme);
   const primaryColor = useUIStore((s) => s.primaryColor);
 
+  const [apiKey, setApiKey] = useState<string>(
+    () => { try { return localStorage.getItem('hermes-api-key') ?? ''; } catch { return ''; } },
+  );
   const [hermesAddress, setHermesAddress] = useState<string>('localhost');
   const [hermesPort, setHermesPort] = useState<string>('8080');
   const [testing, setTesting] = useState<boolean>(false);
@@ -164,6 +167,28 @@ const SettingsPage: React.FC = () => {
                 </Typography>
               )}
             </Box>
+          </Box>
+        </Box>
+
+        {/* API Key */}
+        <Box>
+          <Typography variant="subtitle1" className="mb-2 font-semibold">
+            API Key
+          </Typography>
+          <Box className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+            <TextField
+              label="API Key"
+              size="small"
+              type="password"
+              value={apiKey}
+              placeholder="hermes-chat-dev-key"
+              onChange={(e) => {
+                const val = e.target.value;
+                setApiKey(val);
+                try { localStorage.setItem('hermes-api-key', val); } catch { /* noop */ }
+              }}
+              helperText="Must match the backend API_KEY. Changes take effect on next request."
+            />
           </Box>
         </Box>
 
