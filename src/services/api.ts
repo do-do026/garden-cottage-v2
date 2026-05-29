@@ -39,9 +39,9 @@ function apiUrl(path: string): string {
 /** Read the user-configured API key from localStorage, falling back to the dev default. */
 function getApiKey(): string {
   try {
-    return localStorage.getItem('hermes-api-key') || 'hermes-chat-dev-key';
+    return localStorage.getItem('hermes-api-key') || 'garden-cottage-v2-secret-key-change-me';
   } catch {
-    return 'hermes-chat-dev-key';
+    return 'garden-cottage-v2-secret-key-change-me';
   }
 }
 

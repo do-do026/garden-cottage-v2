@@ -28,7 +28,6 @@ import * as api from '@/services/api';
 import type { Task } from '@shared/types';
 import { TaskStatus } from '@shared/types';
 import { formatTime } from '@/utils/format';
-import { TOPBAR_HEIGHT } from '@/config/constants';
 
 interface NewTaskForm {
   botId: string;
@@ -154,10 +153,7 @@ const TasksPage: React.FC = () => {
   }, [tasks]);
 
   return (
-    <Box
-      className="flex flex-col overflow-hidden"
-      sx={{ pt: `${TOPBAR_HEIGHT}px`, height: '100vh' }}
-    >
+    <Box className="flex flex-col overflow-hidden h-full">
       {/* Header */}
       <Box className="flex items-center justify-between px-4 py-3">
         <Typography variant="h5" className="font-semibold">

@@ -1,7 +1,7 @@
 // ============================================================
 // Hermes Chat — API Key Authentication Middleware
 // Validates the x-api-key header against the configured API_KEY.
-// In development mode the default key is 'hermes-chat-dev-key'.
+// In development mode the default key is 'garden-cottage-v2-secret-key-change-me'.
 // ============================================================
 
 import type { Request, Response, NextFunction } from 'express';

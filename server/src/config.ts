@@ -64,8 +64,8 @@ const envSchema = z.object({
   /** SSH password (fallback when no key is provided). */
   SSH_PASSWORD: z.string().optional(),
 
-  /** API key for authenticating client requests. Dev default: hermes-chat-dev-key */
-  API_KEY: z.string().default('hermes-chat-dev-key'),
+  /** API key for authenticating client requests. Dev default: garden-cottage-v2-secret-key-change-me */
+  API_KEY: z.string().default('garden-cottage-v2-secret-key-change-me'),
 });
 
 // -----------------------------------------------------------

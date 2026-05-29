@@ -18,7 +18,6 @@ import { useUIStore } from '@/store/uiStore';
 import { PRESET_COLORS } from '@/config/constants';
 import * as api from '@/services/api';
 import type { UserSettings } from '@shared/types';
-import { TOPBAR_HEIGHT } from '@/config/constants';
 
 const SettingsPage: React.FC = () => {
   const { toggleTheme, setPrimaryColor } = useTheme();
@@ -89,10 +88,7 @@ const SettingsPage: React.FC = () => {
   }, [notifyEnabled]);
 
   return (
-    <Box
-      className="overflow-y-auto"
-      sx={{ pt: `${TOPBAR_HEIGHT}px`, height: '100vh' }}
-    >
+    <Box className="overflow-y-auto h-full">
       <Box className="mx-auto max-w-2xl space-y-6 px-4 py-6">
         <Typography variant="h5" className="font-semibold">
           Settings
@@ -181,7 +177,7 @@ const SettingsPage: React.FC = () => {
               size="small"
               type="password"
               value={apiKey}
-              placeholder="hermes-chat-dev-key"
+              placeholder="garden-cottage-v2-secret-key-change-me"
               onChange={(e) => {
                 const val = e.target.value;
                 setApiKey(val);

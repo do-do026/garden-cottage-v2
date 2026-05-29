@@ -28,7 +28,6 @@ import { useBotStore } from '@/store/botStore';
 import * as api from '@/services/api';
 import type { Bot } from '@shared/types';
 import { BotStatus } from '@shared/types';
-import { TOPBAR_HEIGHT } from '@/config/constants';
 
 interface NewBotForm {
   name: string;
@@ -151,10 +150,7 @@ const BotsPage: React.FC = () => {
   );
 
   return (
-    <Box
-      className="flex flex-col overflow-hidden"
-      sx={{ pt: `${TOPBAR_HEIGHT}px`, height: '100vh' }}
-    >
+    <Box className="flex flex-col overflow-hidden h-full">
       {/* Header */}
       <Box className="flex items-center justify-between px-4 py-3">
         <Typography variant="h5" className="font-semibold">
