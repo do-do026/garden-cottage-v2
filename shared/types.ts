@@ -38,6 +38,8 @@ export enum UIModType {
   /** @deprecated - Not yet implemented, reserved for future use. */
   SHOW_MODAL = 'SHOW_MODAL',
   SET_BACKGROUND = 'SET_BACKGROUND',
+  SET_FONT = 'SET_FONT',
+  SET_LAYOUT = 'SET_LAYOUT',
 }
 
 /** Connection status of a Hermes bot. */

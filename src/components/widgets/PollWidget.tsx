@@ -64,7 +64,7 @@ const PollWidget: React.FC<PollWidgetProps> = ({ message }) => {
   const [hasVoted, setHasVoted] = useState<boolean>(false);
   const [results, setResults] = useState<PollResultOption[] | null>(null);
   const [isActive, setIsActive] = useState<boolean>(true);
-  const [deadline, setDeadline] = useState<number>(() =>
+  const [deadline] = useState<number>(() =>
     pollData ? getInitialDeadline(message, pollData) : 0,
   );
   const [timeLeft, setTimeLeft] = useState<number>(0);

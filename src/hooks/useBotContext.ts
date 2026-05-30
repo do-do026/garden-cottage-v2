@@ -10,7 +10,7 @@ import { useChatStore } from '@/store/chatStore';
 import * as api from '@/services/api';
 import type { ContextStrategy } from '@shared/types';
 import type { Message } from '@shared/types';
-import { estimateTokens, estimateRemainingTokens } from '@/utils/tiktoken';
+import { estimateRemainingTokens } from '@/utils/tiktoken';
 import { DEFAULT_CONTEXT_STRATEGY, DEFAULT_MAX_CONTEXT_MESSAGES, MAX_CONTEXT_MESSAGES_LIMIT } from '@shared/constants';
 
 export interface UseBotContextReturn {
@@ -49,7 +49,7 @@ export function useBotContext(botId: string): UseBotContextReturn {
   );
 
   const getContextMessages = useCallback(
-    (bid: string, chatId: string): Message[] => {
+    (_bid: string, chatId: string): Message[] => {
       const chatMessages = messages[chatId] ?? [];
       const strategyVal = bot?.contextStrategy ?? DEFAULT_CONTEXT_STRATEGY;
 
