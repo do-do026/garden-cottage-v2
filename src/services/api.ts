@@ -45,7 +45,7 @@ function getApiKey(): string {
   }
 }
 
-/** Shared fetch wrapper that normalises errors. */
+/** Shared fetch wrapper that normalises errors with user-friendly messages. */
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = apiUrl(path);
 
@@ -54,25 +54,74 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     'x-api-key': getApiKey(),
   };
 
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...(options.headers as Record<string, string> | undefined),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...(options.headers as Record<string, string> | undefined),
+      },
+    });
+  } catch (networkError) {
+    // Network-level failure — no response received at all
+    const msg =
+      networkError instanceof TypeError && networkError.message.includes('Failed to fetch')
+        ? '无法连接到服务器，请确认后端是否正在运行 (端口 3001)'
+        : `网络错误: ${networkError instanceof Error ? networkError.message : String(networkError)}`;
+    throw new ApiError(0, 'NETWORK_ERROR', msg);
+  }
 
   if (!res.ok) {
     let code = 'UNKNOWN';
-    let message = `Request failed with status ${res.status}`;
+    let message: string;
+
+    // Provide user-friendly messages for common status codes
+    switch (res.status) {
+      case 401:
+        message = '认证失败 — 请检查 Settings 中的 API Key 是否与后端一致';
+        code = 'UNAUTHORIZED';
+        break;
+      case 403:
+        message = '没有权限执行此操作';
+        code = 'FORBIDDEN';
+        break;
+      case 404:
+        message = '请求的资源不存在';
+        code = 'NOT_FOUND';
+        break;
+      case 429:
+        message = '请求过于频繁，请稍后再试';
+        code = 'RATE_LIMITED';
+        break;
+      case 500:
+        message = '服务器内部错误，请稍后重试';
+        code = 'SERVER_ERROR';
+        break;
+      case 502:
+      case 503:
+      case 504:
+        message = '服务器暂时不可用，请确认后端服务是否正常';
+        code = 'SERVICE_UNAVAILABLE';
+        break;
+      default:
+        message = `请求失败 (状态码 ${res.status})`;
+        break;
+    }
+
+    // Try to extract a more specific message from the response body
     try {
       const body = await res.json();
       if (body?.error) {
         code = body.error.code ?? code;
-        message = body.error.message ?? message;
+        // Append server message to our user-friendly one
+        const serverMsg = body.error.message;
+        if (serverMsg && serverMsg !== message) {
+          message = `${message} — ${serverMsg}`;
+        }
       }
     } catch {
-      // Use default error message
+      // Use the default error message from the switch above
     }
     throw new ApiError(res.status, code, message);
   }

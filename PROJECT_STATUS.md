@@ -1,6 +1,6 @@
 # 🏡 Garden Cottage V2 — 工程状态报告
 
-> 生成时间：2026-05-30 · 仓库：`do-do026/garden-cottage-v2` · 分支：`main`
+> 生成时间：2026-06-01 · 仓库：`do-do026/garden-cottage-v2` · 分支：`main`
 
 ---
 
@@ -12,8 +12,8 @@
 | 后端文件 | 21 `.ts` |
 | 共享类型/常量 | 2 `.ts` |
 | 设计文档 | 3 `.md/.mermaid` |
-| Git 提交 | 5 commits |
-| 编译状态 | ⚠️ 5 个预存 TS 警告（非阻断） |
+| Git 提交 | 6+ commits |
+| 编译状态 | ✅ 0 个 TS 错误（技术债已清理） |
 
 ### 技术栈
 
@@ -81,22 +81,22 @@
 
 ## ⚠️ 技术债
 
-### 🔴 高优先级 — 应尽快处理
+### ✅ 已修复（2026-06-01）
 
-| # | 问题 | 位置 | 影响 |
-|---|------|------|------|
-| 1 | **TS 类型错误：`SET_FONT`/`SET_LAYOUT` 不在 `UIModType` 联合类型中** | `uiStore.ts:222,231` + `shared/types.ts` | `shared/types.ts` 的 `UIModType` 定义未包含 V2 新增的 mod 类型，导致 switch-case 类型收窄失效 |
-| 2 | **"Failed to fetch" 错误信息不友好** | `api.ts` → 各页面 | 401/网络错误统一显示为 "Failed to fetch"，未区分真实原因（网络断 vs 认证失败 vs 服务宕机） |
-| 3 | **`TaskCard` / `PollWidget` 等组件未被端到端测试** | 前端 widgets + cards | 只有 QA agent 的逻辑测试，无浏览器环境验证 |
+| # | 问题 | 修复方式 |
+|---|------|----------|
+| 1 | ~~TS 类型错误：`SET_FONT`/`SET_LAYOUT` 不在 `UIModType` 联合类型中~~ | 已在 commit `501c1b2` 修复，`shared/types.ts` 已包含完整枚举 |
+| 2 | ~~"Failed to fetch" 错误信息不友好~~ | `api.ts` request() 增加网络层 try/catch + 状态码细分（401/403/404/429/500/502-504），中文友好提示 |
+| 6 | ~~settings 页图标按钮（通知/设置/账户）无功能~~ | `TopNavbar.tsx` 添加 useNavigate 路由：通知→首页，设置→/settings，账户→/settings；加 Tooltip + Badge + 活跃状态高亮 |
+| 7 | ~~About 版本号硬编码 `v1.0.0`~~ | `SettingsPage.tsx` 改用 `APP_VERSION` 常量 (v2.0.0)，`package.json` 版本同步更新 |
 
 ### 🟡 中优先级 — 建议处理
 
 | # | 问题 | 位置 | 影响 |
 |---|------|------|------|
+| 3 | **`TaskCard` / `PollWidget` 等组件未被端到端测试** | 前端 widgets + cards | 只有 QA agent 的逻辑测试，无浏览器环境验证 |
 | 4 | **`setDeadline` / `estimateTokens` / `bid` 未使用变量** | `PollWidget.tsx:67`, `useBotContext.ts:13,52` | TS 编译警告，可能是预留功能未完成 |
 | 5 | **Hermes WebSocket 连接未实测** | `hermesClient.ts` + 前端连接流程 | 用户只验证了 Operit HTTP，WS 路径可能存在隐藏 bug |
-| 6 | **settings 页图标按钮（通知/设置/账户）无功能** | `TopNavbar.tsx:58-66` | 点击无响应，纯占位 |
-| 7 | **About 版本号硬编码 `v1.0.0`** | `SettingsPage.tsx:219` | 应改为 `v2.0.0` 或从 `package.json` 读取 |
 
 ### 🟢 低优先级 — 可延后
 

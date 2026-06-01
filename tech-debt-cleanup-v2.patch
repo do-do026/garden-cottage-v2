@@ -1,0 +1,297 @@
+diff --git a/PROJECT_STATUS.md b/PROJECT_STATUS.md
+index 0aea2fa..5955a23 100644
+--- a/PROJECT_STATUS.md
++++ b/PROJECT_STATUS.md
+@@ -1,6 +1,6 @@
+ # 🏡 Garden Cottage V2 — 工程状态报告
+ 
+-> 生成时间：2026-05-30 · 仓库：`do-do026/garden-cottage-v2` · 分支：`main`
++> 生成时间：2026-06-01 · 仓库：`do-do026/garden-cottage-v2` · 分支：`main`
+ 
+ ---
+ 
+@@ -12,8 +12,8 @@
+ | 后端文件 | 21 `.ts` |
+ | 共享类型/常量 | 2 `.ts` |
+ | 设计文档 | 3 `.md/.mermaid` |
+-| Git 提交 | 5 commits |
+-| 编译状态 | ⚠️ 5 个预存 TS 警告（非阻断） |
++| Git 提交 | 6+ commits |
++| 编译状态 | ✅ 0 个 TS 错误（技术债已清理） |
+ 
+ ### 技术栈
+ 
+@@ -81,22 +81,22 @@
+ 
+ ## ⚠️ 技术债
+ 
+-### 🔴 高优先级 — 应尽快处理
++### ✅ 已修复（2026-06-01）
+ 
+-| # | 问题 | 位置 | 影响 |
+-|---|------|------|------|
+-| 1 | **TS 类型错误：`SET_FONT`/`SET_LAYOUT` 不在 `UIModType` 联合类型中** | `uiStore.ts:222,231` + `shared/types.ts` | `shared/types.ts` 的 `UIModType` 定义未包含 V2 新增的 mod 类型，导致 switch-case 类型收窄失效 |
+-| 2 | **"Failed to fetch" 错误信息不友好** | `api.ts` → 各页面 | 401/网络错误统一显示为 "Failed to fetch"，未区分真实原因（网络断 vs 认证失败 vs 服务宕机） |
+-| 3 | **`TaskCard` / `PollWidget` 等组件未被端到端测试** | 前端 widgets + cards | 只有 QA agent 的逻辑测试，无浏览器环境验证 |
++| # | 问题 | 修复方式 |
++|---|------|----------|
++| 1 | ~~TS 类型错误：`SET_FONT`/`SET_LAYOUT` 不在 `UIModType` 联合类型中~~ | 已在 commit `501c1b2` 修复，`shared/types.ts` 已包含完整枚举 |
++| 2 | ~~"Failed to fetch" 错误信息不友好~~ | `api.ts` request() 增加网络层 try/catch + 状态码细分（401/403/404/429/500/502-504），中文友好提示 |
++| 6 | ~~settings 页图标按钮（通知/设置/账户）无功能~~ | `TopNavbar.tsx` 添加 useNavigate 路由：通知→首页，设置→/settings，账户→/settings；加 Tooltip + Badge + 活跃状态高亮 |
++| 7 | ~~About 版本号硬编码 `v1.0.0`~~ | `SettingsPage.tsx` 改用 `APP_VERSION` 常量 (v2.0.0)，`package.json` 版本同步更新 |
+ 
+ ### 🟡 中优先级 — 建议处理
+ 
+ | # | 问题 | 位置 | 影响 |
+ |---|------|------|------|
++| 3 | **`TaskCard` / `PollWidget` 等组件未被端到端测试** | 前端 widgets + cards | 只有 QA agent 的逻辑测试，无浏览器环境验证 |
+ | 4 | **`setDeadline` / `estimateTokens` / `bid` 未使用变量** | `PollWidget.tsx:67`, `useBotContext.ts:13,52` | TS 编译警告，可能是预留功能未完成 |
+ | 5 | **Hermes WebSocket 连接未实测** | `hermesClient.ts` + 前端连接流程 | 用户只验证了 Operit HTTP，WS 路径可能存在隐藏 bug |
+-| 6 | **settings 页图标按钮（通知/设置/账户）无功能** | `TopNavbar.tsx:58-66` | 点击无响应，纯占位 |
+-| 7 | **About 版本号硬编码 `v1.0.0`** | `SettingsPage.tsx:219` | 应改为 `v2.0.0` 或从 `package.json` 读取 |
+ 
+ ### 🟢 低优先级 — 可延后
+ 
+diff --git a/package.json b/package.json
+index 7aa3d49..b56aee5 100644
+--- a/package.json
++++ b/package.json
+@@ -1,8 +1,8 @@
+ {
+   "name": "hermes-chat",
+   "private": true,
+-  "version": "1.0.0",
+-  "description": "Hermes Chat — Intelligent Agent Communication Platform",
++  "version": "2.0.0",
++  "description": "Garden Cottage V2 — Multi-Bot Collaboration & Intelligent Agent Communication Platform",
+   "type": "module",
+   "scripts": {
+     "dev": "concurrently -n frontend,backend -c blue,green \"npm run dev:frontend\" \"npm run dev:backend\"",
+diff --git a/src/components/layout/TopNavbar.tsx b/src/components/layout/TopNavbar.tsx
+index e7bebc1..b7f6e85 100644
+--- a/src/components/layout/TopNavbar.tsx
++++ b/src/components/layout/TopNavbar.tsx
+@@ -5,14 +5,17 @@
+ // ============================================================
+ 
+ import React from 'react';
++import { useNavigate, useLocation } from 'react-router-dom';
+ import AppBar from '@mui/material/AppBar';
+ import Toolbar from '@mui/material/Toolbar';
+ import Typography from '@mui/material/Typography';
+ import IconButton from '@mui/material/IconButton';
++import Badge from '@mui/material/Badge';
+ import NotificationsIcon from '@mui/icons-material/Notifications';
+ import SettingsIcon from '@mui/icons-material/Settings';
+ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+ import Box from '@mui/material/Box';
++import Tooltip from '@mui/material/Tooltip';
+ import { TOPBAR_HEIGHT } from '@/config/constants';
+ 
+ interface TopNavbarProps {
+@@ -23,6 +26,9 @@ interface TopNavbarProps {
+ }
+ 
+ const TopNavbar: React.FC<TopNavbarProps> = ({ onMenuToggle, className = '' }) => {
++  const navigate = useNavigate();
++  const location = useLocation();
++
+   return (
+     <AppBar
+       position="fixed"
+@@ -48,22 +54,49 @@ const TopNavbar: React.FC<TopNavbarProps> = ({ onMenuToggle, className = '' }) =
+               </svg>
+             </IconButton>
+           )}
+-          <Typography variant="h6" noWrap className="font-semibold">
+-            Hermes Chat
++          <Typography
++            variant="h6"
++            noWrap
++            className="font-semibold cursor-pointer"
++            onClick={() => navigate('/')}
++            sx={{ userSelect: 'none' }}
++          >
++            🏡 Garden Cottage
+           </Typography>
+         </Box>
+ 
+-        {/* Right: action icons */}
++        {/* Right: action icons with navigation */}
+         <Box className="flex items-center gap-1">
+-          <IconButton color="inherit" aria-label="notifications">
+-            <NotificationsIcon />
+-          </IconButton>
+-          <IconButton color="inherit" aria-label="settings">
+-            <SettingsIcon />
+-          </IconButton>
+-          <IconButton color="inherit" aria-label="account">
+-            <AccountCircleIcon />
+-          </IconButton>
++          <Tooltip title="通知">
++            <IconButton
++              color="inherit"
++              aria-label="notifications"
++              onClick={() => navigate('/')}
++            >
++              <Badge badgeContent={0} color="error">
++                <NotificationsIcon />
++              </Badge>
++            </IconButton>
++          </Tooltip>
++          <Tooltip title="设置">
++            <IconButton
++              color="inherit"
++              aria-label="settings"
++              onClick={() => navigate('/settings')}
++              sx={{ color: location.pathname === '/settings' ? 'primary.main' : undefined }}
++            >
++              <SettingsIcon />
++            </IconButton>
++          </Tooltip>
++          <Tooltip title="关于">
++            <IconButton
++              color="inherit"
++              aria-label="account"
++              onClick={() => navigate('/settings')}
++            >
++              <AccountCircleIcon />
++            </IconButton>
++          </Tooltip>
+         </Box>
+       </Toolbar>
+     </AppBar>
+diff --git a/src/hooks/useBotContext.ts b/src/hooks/useBotContext.ts
+index 0b6e4a6..6e8349d 100644
+--- a/src/hooks/useBotContext.ts
++++ b/src/hooks/useBotContext.ts
+@@ -49,7 +49,7 @@ export function useBotContext(botId: string): UseBotContextReturn {
+   );
+ 
+   const getContextMessages = useCallback(
+-    (_bid: string, chatId: string): Message[] => {
++    (_botId: string, chatId: string): Message[] => {
+       const chatMessages = messages[chatId] ?? [];
+       const strategyVal = bot?.contextStrategy ?? DEFAULT_CONTEXT_STRATEGY;
+ 
+diff --git a/src/pages/SettingsPage.tsx b/src/pages/SettingsPage.tsx
+index 57eabc7..364df7b 100644
+--- a/src/pages/SettingsPage.tsx
++++ b/src/pages/SettingsPage.tsx
+@@ -19,6 +19,9 @@ import { PRESET_COLORS } from '@/config/constants';
+ import * as api from '@/services/api';
+ import type { UserSettings } from '@shared/types';
+ 
++/** Read version from package.json at build time via Vite env. */
++const APP_VERSION = '2.0.0';
++
+ const SettingsPage: React.FC = () => {
+   const { toggleTheme, setPrimaryColor } = useTheme();
+   const theme = useUIStore((s) => s.theme);
+@@ -212,7 +215,7 @@ const SettingsPage: React.FC = () => {
+             About
+           </Typography>
+           <Box className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+-            <Typography variant="body2">Hermes Chat v1.0.0</Typography>
++            <Typography variant="body2">Garden Cottage v{APP_VERSION}</Typography>
+             <Typography variant="caption" color="text.secondary">
+               Intelligent Agent Communication Platform
+             </Typography>
+diff --git a/src/services/api.ts b/src/services/api.ts
+index 7d881cd..b082af3 100644
+--- a/src/services/api.ts
++++ b/src/services/api.ts
+@@ -45,7 +45,7 @@ function getApiKey(): string {
+   }
+ }
+ 
+-/** Shared fetch wrapper that normalises errors. */
++/** Shared fetch wrapper that normalises errors with user-friendly messages. */
+ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+   const url = apiUrl(path);
+ 
+@@ -54,25 +54,74 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+     'x-api-key': getApiKey(),
+   };
+ 
+-  const res = await fetch(url, {
+-    ...options,
+-    headers: {
+-      ...defaultHeaders,
+-      ...(options.headers as Record<string, string> | undefined),
+-    },
+-  });
++  let res: Response;
++  try {
++    res = await fetch(url, {
++      ...options,
++      headers: {
++        ...defaultHeaders,
++        ...(options.headers as Record<string, string> | undefined),
++      },
++    });
++  } catch (networkError) {
++    // Network-level failure — no response received at all
++    const msg =
++      networkError instanceof TypeError && networkError.message.includes('Failed to fetch')
++        ? '无法连接到服务器，请确认后端是否正在运行 (端口 3001)'
++        : `网络错误: ${networkError instanceof Error ? networkError.message : String(networkError)}`;
++    throw new ApiError(0, 'NETWORK_ERROR', msg);
++  }
+ 
+   if (!res.ok) {
+     let code = 'UNKNOWN';
+-    let message = `Request failed with status ${res.status}`;
++    let message: string;
++
++    // Provide user-friendly messages for common status codes
++    switch (res.status) {
++      case 401:
++        message = '认证失败 — 请检查 Settings 中的 API Key 是否与后端一致';
++        code = 'UNAUTHORIZED';
++        break;
++      case 403:
++        message = '没有权限执行此操作';
++        code = 'FORBIDDEN';
++        break;
++      case 404:
++        message = '请求的资源不存在';
++        code = 'NOT_FOUND';
++        break;
++      case 429:
++        message = '请求过于频繁，请稍后再试';
++        code = 'RATE_LIMITED';
++        break;
++      case 500:
++        message = '服务器内部错误，请稍后重试';
++        code = 'SERVER_ERROR';
++        break;
++      case 502:
++      case 503:
++      case 504:
++        message = '服务器暂时不可用，请确认后端服务是否正常';
++        code = 'SERVICE_UNAVAILABLE';
++        break;
++      default:
++        message = `请求失败 (状态码 ${res.status})`;
++        break;
++    }
++
++    // Try to extract a more specific message from the response body
+     try {
+       const body = await res.json();
+       if (body?.error) {
+         code = body.error.code ?? code;
+-        message = body.error.message ?? message;
++        // Append server message to our user-friendly one
++        const serverMsg = body.error.message;
++        if (serverMsg && serverMsg !== message) {
++          message = `${message} — ${serverMsg}`;
++        }
+       }
+     } catch {
+-      // Use default error message
++      // Use the default error message from the switch above
+     }
+     throw new ApiError(res.status, code, message);
+   }

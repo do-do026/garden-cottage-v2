@@ -1,8 +1,8 @@
 {
   "name": "hermes-chat",
   "private": true,
-  "version": "1.0.0",
-  "description": "Hermes Chat — Intelligent Agent Communication Platform",
+  "version": "2.0.0",
+  "description": "Garden Cottage V2 — Multi-Bot Collaboration & Intelligent Agent Communication Platform",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n frontend,backend -c blue,green \"npm run dev:frontend\" \"npm run dev:backend\"",

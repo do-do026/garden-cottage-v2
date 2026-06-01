@@ -5,14 +5,17 @@
 // ============================================================
 
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import Badge from '@mui/material/Badge';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
 import { TOPBAR_HEIGHT } from '@/config/constants';
 
 interface TopNavbarProps {
@@ -23,6 +26,9 @@ interface TopNavbarProps {
 }
 
 const TopNavbar: React.FC<TopNavbarProps> = ({ onMenuToggle, className = '' }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   return (
     <AppBar
       position="fixed"
@@ -48,22 +54,49 @@ const TopNavbar: React.FC<TopNavbarProps> = ({ onMenuToggle, className = '' }) =
               </svg>
             </IconButton>
           )}
-          <Typography variant="h6" noWrap className="font-semibold">
-            Hermes Chat
+          <Typography
+            variant="h6"
+            noWrap
+            className="font-semibold cursor-pointer"
+            onClick={() => navigate('/')}
+            sx={{ userSelect: 'none' }}
+          >
+            🏡 Garden Cottage
           </Typography>
         </Box>
 
-        {/* Right: action icons */}
+        {/* Right: action icons with navigation */}
         <Box className="flex items-center gap-1">
-          <IconButton color="inherit" aria-label="notifications">
-            <NotificationsIcon />
-          </IconButton>
-          <IconButton color="inherit" aria-label="settings">
-            <SettingsIcon />
-          </IconButton>
-          <IconButton color="inherit" aria-label="account">
-            <AccountCircleIcon />
-          </IconButton>
+          <Tooltip title="通知">
+            <IconButton
+              color="inherit"
+              aria-label="notifications"
+              onClick={() => navigate('/')}
+            >
+              <Badge badgeContent={0} color="error">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="设置">
+            <IconButton
+              color="inherit"
+              aria-label="settings"
+              onClick={() => navigate('/settings')}
+              sx={{ color: location.pathname === '/settings' ? 'primary.main' : undefined }}
+            >
+              <SettingsIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="关于">
+            <IconButton
+              color="inherit"
+              aria-label="account"
+              onClick={() => navigate('/settings')}
+            >
+              <AccountCircleIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Toolbar>
     </AppBar>

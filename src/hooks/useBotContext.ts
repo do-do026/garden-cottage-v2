@@ -49,7 +49,7 @@ export function useBotContext(botId: string): UseBotContextReturn {
   );
 
   const getContextMessages = useCallback(
-    (_bid: string, chatId: string): Message[] => {
+    (_botId: string, chatId: string): Message[] => {
       const chatMessages = messages[chatId] ?? [];
       const strategyVal = bot?.contextStrategy ?? DEFAULT_CONTEXT_STRATEGY;
 

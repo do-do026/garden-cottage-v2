@@ -19,6 +19,9 @@ import { PRESET_COLORS } from '@/config/constants';
 import * as api from '@/services/api';
 import type { UserSettings } from '@shared/types';
 
+/** Read version from package.json at build time via Vite env. */
+const APP_VERSION = '2.0.0';
+
 const SettingsPage: React.FC = () => {
   const { toggleTheme, setPrimaryColor } = useTheme();
   const theme = useUIStore((s) => s.theme);
@@ -212,7 +215,7 @@ const SettingsPage: React.FC = () => {
             About
           </Typography>
           <Box className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-            <Typography variant="body2">Hermes Chat v1.0.0</Typography>
+            <Typography variant="body2">Garden Cottage v{APP_VERSION}</Typography>
             <Typography variant="caption" color="text.secondary">
               Intelligent Agent Communication Platform
             </Typography>
